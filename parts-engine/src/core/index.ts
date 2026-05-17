@@ -39,6 +39,20 @@ export interface PartRelations {
   decides?: PartId[];
   extended_by?: PartId[];
   contradicts?: PartId[];
+  supersedes?: PartId[];
 }
+
+// 関係フィールド名の集合（走査・検証で使う）．
+export const RELATION_FIELDS = [
+  "deps",
+  "implements",
+  "cites",
+  "refs",
+  "decided_in",
+  "decides",
+  "extended_by",
+  "contradicts",
+  "supersedes",
+] as const satisfies readonly (keyof PartRelations)[];
 
 export const VERSION = "0.1.0";
