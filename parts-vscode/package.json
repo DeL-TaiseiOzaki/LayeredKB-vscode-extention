@@ -1,0 +1,67 @@
+{
+  "name": "parts-vscode",
+  "displayName": "Parts (paragraph engineering)",
+  "description": "ワークスペースのパーツを一覧し、整合性違反を Problems に表示する VSCode 拡張（仕様 §10 編集UI層）。",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "paragraph-coding",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["workspaceContains:**/*.md"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "partsContainer",
+          "title": "Parts",
+          "icon": "$(symbol-structure)"
+        }
+      ]
+    },
+    "views": {
+      "partsContainer": [
+        {
+          "id": "partsExplorer",
+          "name": "Parts",
+          "contextualTitle": "Parts"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "parts.check",
+        "title": "Parts: 整合性チェック",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "parts.refresh",
+        "title": "Parts: 一覧を更新",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "parts.refresh", "when": "view == partsExplorer", "group": "navigation" },
+        { "command": "parts.check", "when": "view == partsExplorer", "group": "navigation" }
+      ]
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "vscode:prepublish": "npm run build"
+  },
+  "dependencies": {
+    "parts-engine": "file:../parts-engine"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  }
+}
