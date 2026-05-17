@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { scanWorkspace, checkConsistency, type PartIndex } from "parts-engine";
+import { checkConsistency, type PartIndex } from "parts-engine";
 
 function severityFor(tier: string): vscode.DiagnosticSeverity {
   if (tier === "tier1_absolute_block") return vscode.DiagnosticSeverity.Error;
@@ -8,12 +8,12 @@ function severityFor(tier: string): vscode.DiagnosticSeverity {
   return vscode.DiagnosticSeverity.Information;
 }
 
-// 索引を走査し、構造エラーと整合性違反を Problems パネルへ反映する。
-export async function refreshDiagnostics(
+// 索引から構造エラーと整合性違反を Problems パネルへ反映する。
+export function refreshDiagnostics(
   root: string,
+  index: PartIndex,
   collection: vscode.DiagnosticCollection,
-): Promise<{ index: PartIndex; blocking: number }> {
-  const index = await scanWorkspace(root);
+): { blocking: number } {
   collection.clear();
 
   const byFile = new Map<string, vscode.Diagnostic[]>();
@@ -50,5 +50,5 @@ export async function refreshDiagnostics(
   for (const [relPath, diags] of byFile) {
     collection.set(vscode.Uri.file(path.join(root, relPath)), diags);
   }
-  return { index, blocking };
+  return { blocking };
 }

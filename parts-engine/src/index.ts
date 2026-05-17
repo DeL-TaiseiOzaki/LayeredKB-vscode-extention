@@ -7,6 +7,7 @@ export * from "./core/hash.js";
 export * from "./core/part.js";
 export * from "./core/scanner.js";
 export * from "./core/graph.js";
+export * from "./core/ops.js";
 export * from "./types/index.js";
 export * from "./consistency/index.js";
 export * from "./consistency/engine.js";
