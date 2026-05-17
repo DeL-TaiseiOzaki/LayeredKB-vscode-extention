@@ -40,6 +40,18 @@
         "command": "parts.refresh",
         "title": "Parts: 一覧を更新",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "parts.goToRelated",
+        "title": "Parts: 関係パーツへ移動"
+      },
+      {
+        "command": "parts.split",
+        "title": "Parts: パーツを分割"
+      },
+      {
+        "command": "parts.merge",
+        "title": "Parts: パーツを結合"
       }
     ],
     "menus": {

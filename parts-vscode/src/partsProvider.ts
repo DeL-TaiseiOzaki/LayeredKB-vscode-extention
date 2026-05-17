@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { scanWorkspace, type Part } from "parts-engine";
+import { type Part } from "parts-engine";
+import type { PartsState } from "./state.js";
 
 type Node =
   | { kind: "type"; type: string; parts: Part[] }
@@ -10,19 +11,9 @@ export class PartsProvider implements vscode.TreeDataProvider<Node> {
   private readonly _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChange.event;
 
-  private byType: Map<string, Part[]> = new Map();
+  constructor(private readonly state: PartsState) {}
 
-  constructor(private readonly root: string) {}
-
-  async refresh(): Promise<void> {
-    const index = await scanWorkspace(this.root);
-    const map = new Map<string, Part[]>();
-    for (const p of index.parts) {
-      const list = map.get(p.meta.type) ?? [];
-      list.push(p);
-      map.set(p.meta.type, list);
-    }
-    this.byType = map;
+  refresh(): void {
     this._onDidChange.fire();
   }
 
@@ -50,16 +41,23 @@ export class PartsProvider implements vscode.TreeDataProvider<Node> {
     item.command = {
       command: "vscode.open",
       title: "Open",
-      arguments: [vscode.Uri.file(path.join(this.root, p.filePath))],
+      arguments: [vscode.Uri.file(path.join(this.state.root, p.filePath))],
     };
     return item;
   }
 
   getChildren(node?: Node): Node[] {
+    const parts = this.state.index?.parts ?? [];
     if (!node) {
-      return [...this.byType.entries()]
+      const byType = new Map<string, Part[]>();
+      for (const p of parts) {
+        const list = byType.get(p.meta.type) ?? [];
+        list.push(p);
+        byType.set(p.meta.type, list);
+      }
+      return [...byType.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([type, parts]) => ({ kind: "type", type, parts }));
+        .map(([type, ps]) => ({ kind: "type", type, parts: ps }));
     }
     if (node.kind === "type") {
       return node.parts
