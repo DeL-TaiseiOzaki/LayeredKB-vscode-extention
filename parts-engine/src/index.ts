@@ -9,3 +9,4 @@ export * from "./core/scanner.js";
 export * from "./core/graph.js";
 export * from "./types/index.js";
 export * from "./consistency/index.js";
+export * from "./consistency/engine.js";
