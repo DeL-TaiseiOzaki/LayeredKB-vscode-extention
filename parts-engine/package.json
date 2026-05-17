@@ -1,0 +1,29 @@
+{
+  "name": "parts-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Domain-agnostic core, type layer, consistency engine and CLI for the parts management system (paragraph engineering).",
+  "type": "module",
+  "bin": {
+    "parts": "./dist/cli/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
