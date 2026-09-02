@@ -1,0 +1,12 @@
+.vscode/**
+.vscode-test/**
+.vscode-test.mjs
+out/**
+src/**
+node_modules/**
+.gitignore
+esbuild.js
+eslint.config.mjs
+tsconfig.json
+**/*.map
+**/*.ts

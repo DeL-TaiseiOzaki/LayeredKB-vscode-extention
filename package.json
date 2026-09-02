@@ -1,23 +1,58 @@
 {
-	"name": "vsc-extension-samples",
-	"license": "MIT",
-	"publisher": "Microsoft",
+	"name": "layeredkb",
+	"displayName": "LayeredKB",
+	"description": "A VS Code extension.",
 	"version": "0.0.1",
-	"private": true,
+	"license": "MIT",
+	"publisher": "del-taiseiozaki",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/DeL-TaiseiOzaki/LayeredKB-vscode-extention.git"
+	},
+	"engines": {
+		"vscode": "^1.105.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"main": "./dist/extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"command": "layeredkb.helloWorld",
+				"title": "Hello World",
+				"category": "LayeredKB"
+			}
+		]
+	},
 	"scripts": {
-		"compile-all": "tsx .scripts/run-script.ts compile",
-		"lint-all": "tsx .scripts/run-script.ts lint",
-		"install-all": "tsx .scripts/run-command.ts npm install",
-		"audit-fix-all": "tsx .scripts/run-command.ts npm audit fix",
-		"format-all": "tsx .scripts/format",
-		"update-readme": "tsx .scripts/update-readme.ts",
-		"update-lsif": "tsx .scripts/update-lsif.ts",
-		"validate": "tsx .scripts/validate.ts"
+		"vscode:prepublish": "npm run package",
+		"compile": "npm run check-types && npm run lint && node esbuild.js",
+		"watch": "npm-run-all -p watch:*",
+		"watch:esbuild": "node esbuild.js --watch",
+		"watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+		"package": "npm run check-types && npm run lint && node esbuild.js --production",
+		"compile-tests": "tsc -p . --outDir out",
+		"watch-tests": "tsc -p . -w --outDir out",
+		"pretest": "npm run compile-tests && npm run compile",
+		"check-types": "tsc --noEmit",
+		"lint": "eslint src",
+		"test": "vscode-test"
 	},
 	"devDependencies": {
-		"@types/node": "^22.8.2",
-		"glob": "^11.0.0",
-		"tsx": "^4.19.2",
-		"typescript": "^5.8.2"
+		"@eslint/js": "^10.0.1",
+		"@types/mocha": "^10.0.10",
+		"@types/node": "^22.18.0",
+		"@types/vscode": "^1.105.0",
+		"@vscode/test-cli": "^0.0.15",
+		"@vscode/test-electron": "^3.1.0",
+		"esbuild": "^0.28.2",
+		"eslint": "^10.9.1",
+		"npm-run-all2": "^9.0.3",
+		"typescript": "^5.9.2",
+		"typescript-eslint": "^8.44.0"
+	},
+	"overrides": {
+		"mocha": "^12.0.0"
 	}
 }
