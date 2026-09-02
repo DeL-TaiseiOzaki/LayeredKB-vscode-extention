@@ -12,6 +12,8 @@ suite('Extension Test Suite', () => {
 		assert.ok(extension.isActive);
 
 		const commands = await vscode.commands.getCommands(true);
-		assert.ok(commands.includes('layeredkb.helloWorld'));
+		for (const id of ['layeredkb.refresh', 'layeredkb.configureLayers', 'layeredkb.revealInExplorer']) {
+			assert.ok(commands.includes(id), `command ${id} is not registered`);
+		}
 	});
 });
