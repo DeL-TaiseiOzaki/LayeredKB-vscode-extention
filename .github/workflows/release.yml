@@ -1,0 +1,41 @@
+name: Release
+
+# `v1.2.3` 形式のタグを push すると Marketplace に公開し，GitHub Release に .vsix を添付する．
+# 事前に Marketplace の Personal Access Token をリポジトリの Secrets に VSCE_PAT として登録すること．
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run compile
+      - run: npm run test:unit
+      - name: Check tag matches package.json version
+        run: |
+          PKG_VERSION="v$(node -p "require('./package.json').version")"
+          if [ "$PKG_VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION" >&2
+            exit 1
+          fi
+      - name: Package
+        run: npx @vscode/vsce package --out "layeredkb-${GITHUB_REF_NAME#v}.vsix"
+      - name: Publish to Marketplace
+        run: npx @vscode/vsce publish --packagePath "layeredkb-${GITHUB_REF_NAME#v}.vsix"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: layeredkb-*.vsix
+          generate_release_notes: true

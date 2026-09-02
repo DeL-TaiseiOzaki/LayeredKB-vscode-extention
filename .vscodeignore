@@ -1,6 +1,7 @@
 .vscode/**
 .vscode-test/**
 .vscode-test.mjs
+.github/**
 out/**
 src/**
 node_modules/**
@@ -8,5 +9,7 @@ node_modules/**
 esbuild.js
 eslint.config.mjs
 tsconfig.json
+images/icon.svg
 **/*.map
 **/*.ts
+**/*.vsix

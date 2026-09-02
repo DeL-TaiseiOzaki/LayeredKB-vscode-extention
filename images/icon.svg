@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="48" fill="#1e1e2e"/>
+  <!-- four stacked layers: schema / ontology / knowledge / raw -->
+  <g stroke="#1e1e2e" stroke-width="4" stroke-linejoin="round">
+    <path d="M128 40 L216 84 L128 128 L40 84 Z" fill="#c084fc"/>
+    <path d="M40 84 L128 128 L216 84 L216 104 L128 148 L40 104 Z" fill="#fb923c"/>
+    <path d="M40 104 L128 148 L216 104 L216 132 L128 176 L40 132 Z" fill="#60a5fa"/>
+    <path d="M40 132 L128 176 L216 132 L216 160 L128 204 L40 160 Z" fill="#4ade80"/>
+  </g>
+</svg>
