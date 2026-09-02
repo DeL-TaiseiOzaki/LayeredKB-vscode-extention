@@ -139,7 +139,32 @@ src/
 
 ## 公開
 
+### 初回のみ: publisher と Personal Access Token の準備
+
+1. [Azure DevOps](https://dev.azure.com/) にサインインし，組織を 1 つ作ります（無ければ）．
+2. 右上のユーザー設定から **Personal access tokens** を開き，次の設定でトークンを作ります．
+   - Organization: **All accessible organizations**
+   - Scopes: **Custom defined** → **Marketplace: Manage**
+3. [Marketplace の管理ページ](https://marketplace.visualstudio.com/manage) で publisher を作ります．
+   ID は `package.json` の `publisher`（`del-taiseiozaki`）と一致させてください．
+4. GitHub リポジトリの **Settings → Secrets and variables → Actions** に，2 で作ったトークンを `VSCE_PAT` という名前で登録します．
+
+### リリース手順
+
+`package.json` の `version` を上げて main にマージし，同じ番号のタグを push します．
+Release ワークフローがビルド・テスト・パッケージ・Marketplace 公開・GitHub Release 作成まで行います．
+
 ```bash
-npx @vscode/vsce package   # .vsix を生成
-npx @vscode/vsce publish   # Marketplace へ公開
+npm version patch          # 0.1.0 → 0.1.1（package.json を更新しコミットとタグを作る）
+git push origin main --follow-tags
 ```
+
+手元から直接公開する場合:
+
+```bash
+npx @vscode/vsce login del-taiseiozaki   # トークンを入力
+npx @vscode/vsce package                 # .vsix を生成（内容確認用）
+npx @vscode/vsce publish                 # Marketplace へ公開
+```
+
+公開後，[Marketplace](https://marketplace.visualstudio.com/items?itemName=del-taiseiozaki.layeredkb) に反映されるまで数分かかります．

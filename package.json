@@ -9,6 +9,16 @@
 		"type": "git",
 		"url": "https://github.com/DeL-TaiseiOzaki/LayeredKB-vscode-extention.git"
 	},
+	"homepage": "https://github.com/DeL-TaiseiOzaki/LayeredKB-vscode-extention#readme",
+	"bugs": {
+		"url": "https://github.com/DeL-TaiseiOzaki/LayeredKB-vscode-extention/issues"
+	},
+	"icon": "images/icon.png",
+	"galleryBanner": {
+		"color": "#1e1e2e",
+		"theme": "dark"
+	},
+	"pricing": "Free",
 	"engines": {
 		"vscode": "^1.105.0"
 	},
@@ -415,6 +425,7 @@
 		"@types/vscode": "^1.105.0",
 		"@vscode/test-cli": "^0.0.15",
 		"@vscode/test-electron": "^3.1.0",
+		"@vscode/vsce": "^3.9.2",
 		"esbuild": "^0.28.2",
 		"eslint": "^10.9.1",
 		"mocha": "^12.0.0",
