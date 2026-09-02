@@ -5,6 +5,8 @@ import {
 	classifyFiles,
 	compileLayerMatcher,
 	DEFAULT_LAYERS,
+	filterExternalFiles,
+	hasExternalRoots,
 	LayerDefinition,
 	OTHER_LAYER_ID,
 	validateLayers,
@@ -15,13 +17,13 @@ function file(relativePath: string, rootLabel?: string): ClassifiedFile {
 }
 
 suite('layers: classifyFiles', () => {
-	test('既定レイヤーでスキーマ・知見・その他に分類される', () => {
+	test('既定レイヤーでスキーマ・オントロジー・ナレッジ・その他に分類される', () => {
 		const files = [
 			file('.claude/settings.json'),
 			file('.claude/commands/review.md'),
 			file('AGENTS.md'),
 			file('docs/CLAUDE.md'),
-			file('notes/ontology.csv'),
+			file('ontology/terms.csv'),
 			file('notes/2026/idea.md'),
 			file('src/index.ts'),
 			file('README.md'),
@@ -32,16 +34,21 @@ suite('layers: classifyFiles', () => {
 			byLayer.get('schema')!.map((f) => f.relativePath),
 			['.claude/commands/review.md', '.claude/settings.json', 'AGENTS.md', 'docs/CLAUDE.md']
 		);
+		assert.deepStrictEqual(byLayer.get('ontology')!.map((f) => f.relativePath), ['ontology/terms.csv']);
 		assert.deepStrictEqual(
 			byLayer.get('knowledge')!.map((f) => f.relativePath),
-			['README.md', 'notes/2026/idea.md', 'notes/ontology.csv'] // コードポイント順（大文字が先）
+			['README.md', 'notes/2026/idea.md'] // コードポイント順（大文字が先）
 		);
-		assert.deepStrictEqual(
-			byLayer.get(OTHER_LAYER_ID)!.map((f) => f.relativePath),
-			['src/index.ts']
-		);
+		assert.deepStrictEqual(byLayer.get(OTHER_LAYER_ID)!.map((f) => f.relativePath), ['src/index.ts']);
 		assert.strictEqual(layerOfFile.get('.claude/commands/review.md'), 'schema');
 		assert.strictEqual(layerOfFile.get('src/index.ts'), OTHER_LAYER_ID);
+	});
+
+	test('roots を持つレイヤー（Raw）はワークスペース内ファイルを取り込まない', () => {
+		const { byLayer } = classifyFiles([file('src/index.ts'), file('data/x.bin')], DEFAULT_LAYERS);
+		assert.deepStrictEqual(byLayer.get('raw'), []);
+		assert.strictEqual(byLayer.get(OTHER_LAYER_ID)!.length, 2);
+		assert.ok(hasExternalRoots(DEFAULT_LAYERS.find((l) => l.id === 'raw')!));
 	});
 
 	test('先に定義したレイヤーが優先される（first-match-wins）', () => {
@@ -56,8 +63,16 @@ suite('layers: classifyFiles', () => {
 
 	test('ファイルが無いレイヤーも空配列として含まれる', () => {
 		const { byLayer } = classifyFiles([], DEFAULT_LAYERS);
-		assert.deepStrictEqual([...byLayer.keys()], ['schema', 'knowledge', OTHER_LAYER_ID]);
+		assert.deepStrictEqual([...byLayer.keys()], ['schema', 'ontology', 'knowledge', 'raw', OTHER_LAYER_ID]);
 		assert.deepStrictEqual(byLayer.get('schema'), []);
+	});
+});
+
+suite('layers: filterExternalFiles', () => {
+	test('外部フォルダのファイルはレイヤーの patterns で絞り込まれる', () => {
+		const layer: LayerDefinition = { id: 'raw', label: 'Raw', patterns: ['**/*.pdf', 'scans/**'], roots: ['~/Drive'] };
+		const result = filterExternalFiles([file('a.pdf'), file('scans/1.png'), file('notes.txt')], layer);
+		assert.deepStrictEqual(result.map((f) => f.relativePath), ['a.pdf', 'scans/1.png']);
 	});
 });
 
@@ -80,14 +95,15 @@ suite('layers: validateLayers', () => {
 		assert.deepStrictEqual(validateLayers(DEFAULT_LAYERS), []);
 	});
 
-	test('ID 重複・予約 ID・patterns 欠落を検出する', () => {
+	test('ID 重複・予約 ID・patterns 欠落・roots の型を検出する', () => {
 		const problems = validateLayers([
 			{ id: 'a', label: 'a', patterns: ['**'] },
 			{ id: 'a', label: 'a', patterns: ['**'] },
 			{ id: OTHER_LAYER_ID, label: 'o', patterns: ['**'] },
 			{ id: 'b', label: 'b', patterns: [] },
+			{ id: 'c', label: 'c', patterns: ['**'], roots: '~/x' as unknown as string[] },
 		]);
-		assert.strictEqual(problems.length, 3);
+		assert.strictEqual(problems.length, 4);
 	});
 });
 
@@ -109,7 +125,7 @@ suite('layers: buildTree', () => {
 		assert.strictEqual(root.directories[0].files.length, 2);
 	});
 
-	test('マルチルートではルート名がツリー先頭に付く', () => {
+	test('複数ルートではルート名がツリー先頭に付く', () => {
 		const root = buildTree([file('notes/a.md', 'kb'), file('notes/b.md', 'kb2')], false);
 		assert.deepStrictEqual(root.directories.map((d) => d.name), ['kb', 'kb2']);
 		assert.strictEqual(root.directories[0].directories[0].path, 'kb/notes');

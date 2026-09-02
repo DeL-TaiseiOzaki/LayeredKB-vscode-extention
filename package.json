@@ -1,7 +1,7 @@
 {
 	"name": "layeredkb",
 	"displayName": "LayeredKB",
-	"description": "Personal Knowledge Base のワークスペースを「スキーマ層 / 知見層 / その他」のレイヤーで整理して表示する VS Code 拡張機能．",
+	"description": "Personal Knowledge Base のワークスペースを「スキーマ層 / オントロジー層 / ナレッジベース層 / Raw データ層」のパネルに分けて表示する VS Code 拡張機能．",
 	"version": "0.1.0",
 	"license": "MIT",
 	"publisher": "del-taiseiozaki",
@@ -20,28 +20,119 @@
 		"PKB",
 		"explorer",
 		"claude",
-		"agents"
+		"agents",
+		"ontology"
 	],
 	"activationEvents": [
-		"workspaceContains:**/*"
+		"onStartupFinished"
 	],
 	"main": "./dist/extension.js",
 	"contributes": {
-		"views": {
-			"explorer": [
+		"viewsContainers": {
+			"activitybar": [
 				{
-					"id": "layeredkb.layers",
-					"name": "LayeredKB",
-					"icon": "$(layers)",
+					"id": "layeredkb",
+					"title": "LayeredKB",
+					"icon": "$(layers)"
+				}
+			]
+		},
+		"views": {
+			"layeredkb": [
+				{
+					"id": "layeredkb.slot0",
+					"name": "Layer 1",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot1",
+					"name": "Layer 2",
+					"when": "layeredkb.slot1.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot2",
+					"name": "Layer 3",
+					"when": "layeredkb.slot2.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot3",
+					"name": "Layer 4",
+					"when": "layeredkb.slot3.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot4",
+					"name": "Layer 5",
+					"when": "layeredkb.slot4.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot5",
+					"name": "Layer 6",
+					"when": "layeredkb.slot5.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot6",
+					"name": "Layer 7",
+					"when": "layeredkb.slot6.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot7",
+					"name": "Layer 8",
+					"when": "layeredkb.slot7.visible",
 					"contextualTitle": "LayeredKB"
 				}
 			]
 		},
 		"viewsWelcome": [
 			{
-				"view": "layeredkb.layers",
+				"view": "layeredkb.slot0",
 				"contents": "フォルダーを開くと，ファイルをレイヤーごとに整理して表示します．\n[フォルダーを開く](command:vscode.openFolder)",
 				"when": "workbenchState == empty"
+			},
+			{
+				"view": "layeredkb.slot0",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot1",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot2",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot3",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot4",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot5",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot6",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot7",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
 			}
 		],
 		"commands": [
@@ -109,39 +200,39 @@
 			"view/title": [
 				{
 					"command": "layeredkb.refresh",
-					"when": "view == layeredkb.layers",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/",
 					"group": "navigation@1"
 				},
 				{
 					"command": "layeredkb.configureLayers",
-					"when": "view == layeredkb.layers",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/",
 					"group": "navigation@2"
 				}
 			],
 			"view/item/context": [
 				{
 					"command": "layeredkb.openToSide",
-					"when": "view == layeredkb.layers && viewItem == layeredkb.file",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/ && viewItem == layeredkb.file",
 					"group": "navigation@1"
 				},
 				{
 					"command": "layeredkb.revealInExplorer",
-					"when": "view == layeredkb.layers && viewItem == layeredkb.file",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/ && viewItem == layeredkb.file",
 					"group": "2_reveal@1"
 				},
 				{
 					"command": "layeredkb.revealFileInOS",
-					"when": "view == layeredkb.layers && viewItem == layeredkb.file",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/ && viewItem == layeredkb.file",
 					"group": "2_reveal@2"
 				},
 				{
 					"command": "layeredkb.copyPath",
-					"when": "view == layeredkb.layers && viewItem == layeredkb.file",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/ && viewItem == layeredkb.file",
 					"group": "3_copy@1"
 				},
 				{
 					"command": "layeredkb.copyRelativePath",
-					"when": "view == layeredkb.layers && viewItem == layeredkb.file",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/ && viewItem == layeredkb.file",
 					"group": "3_copy@2"
 				}
 			]
@@ -151,11 +242,11 @@
 			"properties": {
 				"layeredkb.layers": {
 					"type": "array",
-					"markdownDescription": "レイヤーの定義．上から順に評価され，最初に一致したレイヤーが採用されます．どのレイヤーにも一致しないファイルは `Other` に入ります．",
+					"markdownDescription": "レイヤーの定義．各レイヤーは独立したパネルとして表示されます（最大 8 個）．上から順に評価され，最初に一致したレイヤーが採用されます．どのレイヤーにも一致しないファイルは「その他」に入ります．`roots` を指定したレイヤーはワークスペース外のフォルダだけを走査します．",
 					"default": [
 						{
 							"id": "schema",
-							"label": "Schema",
+							"label": "スキーマ層",
 							"description": "CLI エージェントの振る舞いを規定する層（.claude, AGENTS.md など）",
 							"icon": "law",
 							"badge": "S",
@@ -180,18 +271,42 @@
 							]
 						},
 						{
+							"id": "ontology",
+							"label": "オントロジー層",
+							"description": "この PKB のオントロジー（主に CSV）",
+							"icon": "type-hierarchy",
+							"badge": "O",
+							"color": "charts.orange",
+							"patterns": [
+								"**/*.csv",
+								"**/*.tsv",
+								"ontology/**",
+								"ontologies/**"
+							]
+						},
+						{
 							"id": "knowledge",
-							"label": "Knowledge",
-							"description": "知見・情報とオントロジー（Markdown / CSV）",
+							"label": "ナレッジベース層",
+							"description": "メインの知見・情報（Markdown 群）",
 							"icon": "book",
 							"badge": "K",
 							"color": "charts.blue",
 							"patterns": [
 								"**/*.md",
-								"**/*.mdx",
-								"**/*.csv",
-								"**/*.tsv"
+								"**/*.mdx"
 							]
+						},
+						{
+							"id": "raw",
+							"label": "Raw データ層",
+							"description": "Google Drive などの生データ置き場（Git 管理外）．roots にフォルダを設定する",
+							"icon": "database",
+							"badge": "R",
+							"color": "charts.green",
+							"patterns": [
+								"**/*"
+							],
+							"roots": []
 						}
 					],
 					"items": {
@@ -208,7 +323,7 @@
 							},
 							"label": {
 								"type": "string",
-								"description": "ツリーに表示する名前"
+								"description": "パネルに表示する名前"
 							},
 							"description": {
 								"type": "string",
@@ -216,7 +331,7 @@
 							},
 							"icon": {
 								"type": "string",
-								"description": "codicon の名前（例: law, book, database, beaker）"
+								"description": "codicon の名前（例: law, book, database, type-hierarchy）"
 							},
 							"badge": {
 								"type": "string",
@@ -232,7 +347,14 @@
 								"items": {
 									"type": "string"
 								},
-								"description": "ワークスペースルートからの相対 glob パターン"
+								"description": "ルートからの相対 glob パターン"
+							},
+							"roots": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								},
+								"description": "走査するフォルダ（絶対パス，~，またはワークスペース相対パス）．指定するとこのレイヤーはワークスペース内ファイルの分類に参加しません．Google Drive など Git 管理外の置き場に使います"
 							}
 						}
 					}
@@ -248,12 +370,12 @@
 						"**/dist/**",
 						"**/out/**"
 					],
-					"description": "走査から除外する glob パターン（`files.exclude` に加えて適用されます）"
+					"description": "走査から除外する glob パターン（ワークスペースでは `files.exclude` に加えて適用されます）"
 				},
 				"layeredkb.showOtherLayer": {
 					"type": "boolean",
 					"default": true,
-					"description": "どのレイヤーにも属さないファイルを `Other` レイヤーとして表示する"
+					"description": "どのレイヤーにも属さないファイルを「その他」パネルとして表示する"
 				},
 				"layeredkb.compactFolders": {
 					"type": "boolean",

@@ -1,36 +1,53 @@
 # LayeredKB
 
-Personal Knowledge Base（PKB）のワークスペースを，役割ごとの **レイヤー** に整理して表示する VS Code 拡張機能です．
+Personal Knowledge Base（PKB）のワークスペースを，役割ごとの **レイヤー** に分けて表示する VS Code 拡張機能です．
 
 PKB を CLI エージェント（Claude Code など）と一緒に運用すると，ワークスペースには性質の異なるファイルが混在します．
-LayeredKB はそれらをディレクトリ構造ではなく「どの層に属するか」で見せます．
+LayeredKB は開いているフォルダはそのままに，ユーザーが設定した層分けに従ってファイルやフォルダを **層ごとの独立したパネル** に振り分けて表示します．
+フォルダ構成を変える必要はありません．
 
-| レイヤー | 役割 | 既定で含まれるもの |
-| --- | --- | --- |
-| **Schema** | CLI エージェントの振る舞いを規定する層 | `.claude/**`, `CLAUDE.md`, `AGENTS.md`, `.cursor/**`, `.codex/**`, `.gemini/**`, `.github/copilot-instructions.md`, `.mcp.json` など |
-| **Knowledge** | メインの知見・情報とオントロジー | `**/*.md`, `**/*.mdx`, `**/*.csv`, `**/*.tsv` |
-| **Other** | どのレイヤーにも属さないファイル | 上記以外 |
+```
+┌ LayeredKB ───────────────┐
+│ ▾ スキーマ層          12  │  .claude/, CLAUDE.md, AGENTS.md ...
+│ ▾ オントロジー層       3  │  *.csv
+│ ▾ ナレッジベース層   148  │  *.md
+│ ▾ Raw データ層       902  │  ~/Google Drive/PKB-raw（Git 管理外）
+│ ▾ その他               7  │  上記以外
+└──────────────────────────┘
+```
+
+| レイヤー | 役割 | Git 管理 | 既定で含まれるもの |
+| --- | --- | --- | --- |
+| **スキーマ層** | CLI エージェントの振る舞いを規定する層 | ○ | `.claude/**`, `CLAUDE.md`, `AGENTS.md`, `.cursor/**`, `.codex/**`, `.gemini/**`, `.github/copilot-instructions.md`, `.mcp.json` など |
+| **オントロジー層** | この PKB のオントロジー | ○ | `**/*.csv`, `**/*.tsv`, `ontology/**` |
+| **ナレッジベース層** | メインの知見・情報 | ○ | `**/*.md`, `**/*.mdx` |
+| **Raw データ層** | Google Drive などの生データ置き場 | × | `roots` に指定したフォルダ配下の全ファイル（未設定なら空） |
+| **その他** | どのレイヤーにも属さないファイル | | 上記以外（`layeredkb.showOtherLayer` で非表示可） |
 
 ## 機能
 
-- **エクスプローラー内の「LayeredKB」ビュー**: レイヤー → ディレクトリ → ファイルのツリー．レイヤー行にはファイル数を表示します．
-  クリックで開く，右クリックで「横に開く」「エクスプローラーで表示」「パスをコピー」などが使えます．
-- **標準エクスプローラーの装飾**: 各ファイルに所属レイヤーのバッジ（`S` / `K`）と色を付けます（`layeredkb.decorateExplorer` で無効化可）．
+- **レイヤーごとのパネル**: アクティビティバーの LayeredKB アイコンを開くと，各レイヤーが独立したパネル（ビュー）として並びます．パネルのタイトルにファイル数を表示します．
+  パネルはドラッグで並べ替え・エクスプローラーへの移動ができます．
+- **ワークスペース外フォルダ**: レイヤーに `roots` を指定すると，Google Drive など Git 管理外のフォルダを走査してそのパネルに表示します．
+- **標準エクスプローラーの装飾**: 各ファイルに所属レイヤーのバッジ（`S` / `O` / `K`）と色を付けます（`layeredkb.decorateExplorer` で無効化可）．
 - **コンパクトフォルダー**: 子が 1 つしかないフォルダーは `a/b/c` のように 1 行にまとめます．
-- **自動更新**: ファイルの追加・削除・設定変更を検知して再走査します．
-- **マルチルート対応**: 複数のワークスペースフォルダーはルート名を先頭に付けて表示します．
+- **自動更新**: ファイルの追加・削除・設定変更を検知して再走査します（`roots` のフォルダも監視します）．
+- **ファイル操作**: クリックで開く，右クリックで「横に開く」「エクスプローラーで表示」「OS で表示」「パスをコピー」．
+- **マルチルート対応**: 複数のワークスペースフォルダはルート名を先頭に付けて表示します．
 
 ## レイヤーのカスタマイズ
 
-レイヤーは `layeredkb.layers` 設定で自由に定義できます．上から順に評価され，最初に一致したレイヤーが採用されます（first-match-wins）．
-たとえばオントロジーを独立したレイヤーにし，生データ層を追加するには `.vscode/settings.json` に次のように書きます．
+レイヤーは `layeredkb.layers` 設定で自由に定義できます（最大 8 個）．上から順に評価され，最初に一致したレイヤーが採用されます（first-match-wins）．
+`roots` を持つレイヤーは指定フォルダだけを走査し，ワークスペース内ファイルの分類には参加しません．
+
+`.vscode/settings.json` の例（Raw データ層に Google Drive のフォルダを割り当てる）:
 
 ```jsonc
 {
   "layeredkb.layers": [
     {
       "id": "schema",
-      "label": "Schema",
+      "label": "スキーマ層",
       "icon": "law",
       "badge": "S",
       "color": "charts.purple",
@@ -38,27 +55,26 @@ LayeredKB はそれらをディレクトリ構造ではなく「どの層に属�
     },
     {
       "id": "ontology",
-      "label": "Ontology",
+      "label": "オントロジー層",
       "icon": "type-hierarchy",
       "badge": "O",
       "color": "charts.orange",
-      "patterns": ["ontology/**", "**/*.ontology.csv"]
+      "patterns": ["ontology/**", "**/*.csv"]
     },
     {
       "id": "knowledge",
-      "label": "Knowledge",
+      "label": "ナレッジベース層",
       "icon": "book",
       "badge": "K",
       "color": "charts.blue",
-      "patterns": ["**/*.md", "**/*.csv"]
+      "patterns": ["**/*.md"]
     },
     {
       "id": "raw",
-      "label": "Raw Sources",
+      "label": "Raw データ層",
       "icon": "database",
-      "badge": "R",
-      "color": "charts.green",
-      "patterns": ["raw/**", "**/*.pdf", "**/*.html"]
+      "patterns": ["**/*"],
+      "roots": ["~/Google Drive/PKB-raw", "../raw-data"]
     }
   ]
 }
@@ -69,8 +85,9 @@ LayeredKB はそれらをディレクトリ構造ではなく「どの層に属�
 | フィールド | 必須 | 説明 |
 | --- | --- | --- |
 | `id` | ○ | 一意な ID（`other` は予約済み） |
-| `label` | ○ | ツリーに表示する名前 |
-| `patterns` | ○ | ワークスペースルートからの相対 glob（`**`，ブレース展開可） |
+| `label` | ○ | パネルに表示する名前 |
+| `patterns` | ○ | ルートからの相対 glob（`**`，ブレース展開可） |
+| `roots` | | 走査するフォルダ（絶対パス，`~`，またはワークスペース相対パス）．指定するとワークスペース外専用のレイヤーになる |
 | `description` | | ツールチップの説明 |
 | `icon` | | [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) の名前 |
 | `badge` | | 標準エクスプローラーに出すバッジ（1〜2 文字） |
@@ -80,12 +97,10 @@ LayeredKB はそれらをディレクトリ構造ではなく「どの層に属�
 
 | 設定 | 既定値 | 説明 |
 | --- | --- | --- |
-| `layeredkb.exclude` | `node_modules`, `.git`, `dist`, `out` | 走査から除外する glob（`files.exclude` に加えて適用） |
-| `layeredkb.showOtherLayer` | `true` | `Other` レイヤーを表示する |
+| `layeredkb.exclude` | `node_modules`, `.git`, `dist`, `out` | 走査から除外する glob（ワークスペースでは `files.exclude` に加えて適用） |
+| `layeredkb.showOtherLayer` | `true` | 「その他」パネルを表示する |
 | `layeredkb.compactFolders` | `true` | コンパクトフォルダー表示 |
 | `layeredkb.decorateExplorer` | `true` | 標準エクスプローラーにバッジと色を付ける |
-
-標準の「フォルダー」ビューを畳んで LayeredKB ビューだけを使うと，エクスプローラー全体がレイヤー表示になります．
 
 ## 開発
 
@@ -109,16 +124,18 @@ VS Code でこのフォルダを開き，`F5`（Run Extension）で拡張機能�
 
 ```
 src/
-├── extension.ts            # エントリポイント（ビュー・コマンド・装飾の登録）
+├── extension.ts            # エントリポイント（ビュー枠・コマンド・装飾の登録）
 ├── layers.ts               # レイヤー定義・分類・ツリー構築（VS Code API 非依存）
 ├── config.ts               # 設定の読み込みと検証
-├── workspaceIndex.ts       # ワークスペース走査と分類結果の保持
-├── layerTreeProvider.ts    # TreeDataProvider
+├── workspaceIndex.ts       # ワークスペースと roots の走査，分類結果の保持
+├── layerTreeProvider.ts    # 1 レイヤー分の TreeDataProvider
 ├── explorerDecorations.ts  # FileDecorationProvider
 └── test/
     ├── extension.test.ts   # 統合テスト
     └── unit/               # 単体テスト
 ```
+
+ビューは動的に追加できないため，`package.json` に 8 個のビュー枠（`layeredkb.slot0`〜`slot7`）を静的に宣言し，設定に応じてタイトルと表示/非表示を切り替えています．
 
 ## 公開
 
