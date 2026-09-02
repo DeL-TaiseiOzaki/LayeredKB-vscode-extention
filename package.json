@@ -1,8 +1,8 @@
 {
 	"name": "layeredkb",
 	"displayName": "LayeredKB",
-	"description": "A VS Code extension.",
-	"version": "0.0.1",
+	"description": "Personal Knowledge Base のワークスペースを「スキーマ層 / オントロジー層 / ナレッジベース層 / Raw データ層」のパネルに分けて表示する VS Code 拡張機能．",
+	"version": "0.1.0",
 	"license": "MIT",
 	"publisher": "del-taiseiozaki",
 	"repository": {
@@ -15,15 +15,380 @@
 	"categories": [
 		"Other"
 	],
+	"keywords": [
+		"knowledge base",
+		"PKB",
+		"explorer",
+		"claude",
+		"agents",
+		"ontology"
+	],
+	"activationEvents": [
+		"onStartupFinished"
+	],
 	"main": "./dist/extension.js",
 	"contributes": {
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "layeredkb",
+					"title": "LayeredKB",
+					"icon": "$(layers)"
+				}
+			]
+		},
+		"views": {
+			"layeredkb": [
+				{
+					"id": "layeredkb.slot0",
+					"name": "Layer 1",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot1",
+					"name": "Layer 2",
+					"when": "layeredkb.slot1.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot2",
+					"name": "Layer 3",
+					"when": "layeredkb.slot2.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot3",
+					"name": "Layer 4",
+					"when": "layeredkb.slot3.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot4",
+					"name": "Layer 5",
+					"when": "layeredkb.slot4.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot5",
+					"name": "Layer 6",
+					"when": "layeredkb.slot5.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot6",
+					"name": "Layer 7",
+					"when": "layeredkb.slot6.visible",
+					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.slot7",
+					"name": "Layer 8",
+					"when": "layeredkb.slot7.visible",
+					"contextualTitle": "LayeredKB"
+				}
+			]
+		},
+		"viewsWelcome": [
+			{
+				"view": "layeredkb.slot0",
+				"contents": "フォルダーを開くと，ファイルをレイヤーごとに整理して表示します．\n[フォルダーを開く](command:vscode.openFolder)",
+				"when": "workbenchState == empty"
+			},
+			{
+				"view": "layeredkb.slot0",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot1",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot2",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot3",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot4",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot5",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot6",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			},
+			{
+				"view": "layeredkb.slot7",
+				"contents": "このレイヤーに該当するファイルはありません．\n[レイヤー設定を開く](command:layeredkb.configureLayers)",
+				"when": "workbenchState != empty"
+			}
+		],
 		"commands": [
 			{
-				"command": "layeredkb.helloWorld",
-				"title": "Hello World",
+				"command": "layeredkb.refresh",
+				"title": "Refresh Layers",
+				"category": "LayeredKB",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "layeredkb.configureLayers",
+				"title": "Configure Layers",
+				"category": "LayeredKB",
+				"icon": "$(gear)"
+			},
+			{
+				"command": "layeredkb.openToSide",
+				"title": "Open to the Side",
+				"category": "LayeredKB"
+			},
+			{
+				"command": "layeredkb.revealInExplorer",
+				"title": "Reveal in Explorer View",
+				"category": "LayeredKB"
+			},
+			{
+				"command": "layeredkb.revealFileInOS",
+				"title": "Reveal in File Explorer",
+				"category": "LayeredKB"
+			},
+			{
+				"command": "layeredkb.copyPath",
+				"title": "Copy Path",
+				"category": "LayeredKB"
+			},
+			{
+				"command": "layeredkb.copyRelativePath",
+				"title": "Copy Relative Path",
 				"category": "LayeredKB"
 			}
-		]
+		],
+		"menus": {
+			"commandPalette": [
+				{
+					"command": "layeredkb.openToSide",
+					"when": "false"
+				},
+				{
+					"command": "layeredkb.revealInExplorer",
+					"when": "false"
+				},
+				{
+					"command": "layeredkb.revealFileInOS",
+					"when": "false"
+				},
+				{
+					"command": "layeredkb.copyPath",
+					"when": "false"
+				},
+				{
+					"command": "layeredkb.copyRelativePath",
+					"when": "false"
+				}
+			],
+			"view/title": [
+				{
+					"command": "layeredkb.refresh",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/",
+					"group": "navigation@1"
+				},
+				{
+					"command": "layeredkb.configureLayers",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/",
+					"group": "navigation@2"
+				}
+			],
+			"view/item/context": [
+				{
+					"command": "layeredkb.openToSide",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/ && viewItem == layeredkb.file",
+					"group": "navigation@1"
+				},
+				{
+					"command": "layeredkb.revealInExplorer",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/ && viewItem == layeredkb.file",
+					"group": "2_reveal@1"
+				},
+				{
+					"command": "layeredkb.revealFileInOS",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/ && viewItem == layeredkb.file",
+					"group": "2_reveal@2"
+				},
+				{
+					"command": "layeredkb.copyPath",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/ && viewItem == layeredkb.file",
+					"group": "3_copy@1"
+				},
+				{
+					"command": "layeredkb.copyRelativePath",
+					"when": "view =~ /^layeredkb\\.slot\\d+$/ && viewItem == layeredkb.file",
+					"group": "3_copy@2"
+				}
+			]
+		},
+		"configuration": {
+			"title": "LayeredKB",
+			"properties": {
+				"layeredkb.layers": {
+					"type": "array",
+					"markdownDescription": "レイヤーの定義．各レイヤーは独立したパネルとして表示されます（最大 8 個）．上から順に評価され，最初に一致したレイヤーが採用されます．どのレイヤーにも一致しないファイルは「その他」に入ります．`roots` を指定したレイヤーはワークスペース外のフォルダだけを走査します．",
+					"default": [
+						{
+							"id": "schema",
+							"label": "スキーマ層",
+							"description": "CLI エージェントの振る舞いを規定する層（.claude, AGENTS.md など）",
+							"icon": "law",
+							"badge": "S",
+							"color": "charts.purple",
+							"patterns": [
+								".claude/**",
+								".claude.json",
+								"**/CLAUDE.md",
+								"**/CLAUDE.local.md",
+								"**/AGENTS.md",
+								".agents/**",
+								".codex/**",
+								".cursor/**",
+								".cursorrules",
+								".gemini/**",
+								"**/GEMINI.md",
+								".github/copilot-instructions.md",
+								".github/instructions/**",
+								".github/prompts/**",
+								".windsurfrules",
+								".mcp.json"
+							]
+						},
+						{
+							"id": "ontology",
+							"label": "オントロジー層",
+							"description": "この PKB のオントロジー（主に CSV）",
+							"icon": "type-hierarchy",
+							"badge": "O",
+							"color": "charts.orange",
+							"patterns": [
+								"**/*.csv",
+								"**/*.tsv",
+								"ontology/**",
+								"ontologies/**"
+							]
+						},
+						{
+							"id": "knowledge",
+							"label": "ナレッジベース層",
+							"description": "メインの知見・情報（Markdown 群）",
+							"icon": "book",
+							"badge": "K",
+							"color": "charts.blue",
+							"patterns": [
+								"**/*.md",
+								"**/*.mdx"
+							]
+						},
+						{
+							"id": "raw",
+							"label": "Raw データ層",
+							"description": "Google Drive などの生データ置き場（Git 管理外）．roots にフォルダを設定する",
+							"icon": "database",
+							"badge": "R",
+							"color": "charts.green",
+							"patterns": [
+								"**/*"
+							],
+							"roots": []
+						}
+					],
+					"items": {
+						"type": "object",
+						"required": [
+							"id",
+							"label",
+							"patterns"
+						],
+						"properties": {
+							"id": {
+								"type": "string",
+								"description": "レイヤーの一意な ID（\"other\" は予約済み）"
+							},
+							"label": {
+								"type": "string",
+								"description": "パネルに表示する名前"
+							},
+							"description": {
+								"type": "string",
+								"description": "ツールチップに表示する説明"
+							},
+							"icon": {
+								"type": "string",
+								"description": "codicon の名前（例: law, book, database, type-hierarchy）"
+							},
+							"badge": {
+								"type": "string",
+								"maxLength": 2,
+								"description": "標準エクスプローラーに表示するバッジ（1〜2 文字）"
+							},
+							"color": {
+								"type": "string",
+								"description": "標準エクスプローラーの装飾に使うテーマカラー ID（例: charts.blue）"
+							},
+							"patterns": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								},
+								"description": "ルートからの相対 glob パターン"
+							},
+							"roots": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								},
+								"description": "走査するフォルダ（絶対パス，~，またはワークスペース相対パス）．指定するとこのレイヤーはワークスペース内ファイルの分類に参加しません．Google Drive など Git 管理外の置き場に使います"
+							}
+						}
+					}
+				},
+				"layeredkb.exclude": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [
+						"**/node_modules/**",
+						"**/.git/**",
+						"**/dist/**",
+						"**/out/**"
+					],
+					"description": "走査から除外する glob パターン（ワークスペースでは `files.exclude` に加えて適用されます）"
+				},
+				"layeredkb.showOtherLayer": {
+					"type": "boolean",
+					"default": true,
+					"description": "どのレイヤーにも属さないファイルを「その他」パネルとして表示する"
+				},
+				"layeredkb.compactFolders": {
+					"type": "boolean",
+					"default": true,
+					"description": "子が 1 つしかないフォルダーを 1 行にまとめて表示する（エクスプローラーのコンパクトフォルダーと同様）"
+				},
+				"layeredkb.decorateExplorer": {
+					"type": "boolean",
+					"default": true,
+					"description": "標準エクスプローラー上のファイルにレイヤーのバッジと色を付ける"
+				}
+			}
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run package",
@@ -37,7 +402,11 @@
 		"pretest": "npm run compile-tests && npm run compile",
 		"check-types": "tsc --noEmit",
 		"lint": "eslint src",
-		"test": "vscode-test"
+		"test": "vscode-test",
+		"test:unit": "npm run compile-tests && mocha --ui tdd \"out/test/unit/**/*.test.js\""
+	},
+	"dependencies": {
+		"minimatch": "^10.2.6"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -48,6 +417,7 @@
 		"@vscode/test-electron": "^3.1.0",
 		"esbuild": "^0.28.2",
 		"eslint": "^10.9.1",
+		"mocha": "^12.0.0",
 		"npm-run-all2": "^9.0.3",
 		"typescript": "^5.9.2",
 		"typescript-eslint": "^8.44.0"

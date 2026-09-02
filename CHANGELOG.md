@@ -1,5 +1,10 @@
 # Change Log
 
-## [Unreleased]
+## 0.1.0
 
-- Initial scaffold.
+- アクティビティバーに LayeredKB コンテナを追加．スキーマ層 / オントロジー層 / ナレッジベース層 / Raw データ層 / その他 をそれぞれ独立したパネルとして表示
+- `layeredkb.layers` 設定でレイヤーを自由に定義可能（first-match-wins，最大 8 個）
+- レイヤーの `roots` で Google Drive など Git 管理外のフォルダを走査・表示
+- 標準エクスプローラーにレイヤーのバッジと色を付ける FileDecorationProvider
+- コンパクトフォルダー表示，ファイル監視による自動更新，マルチルート対応
+- ファイルのコンテキストメニュー（横に開く・エクスプローラーで表示・OS で表示・パスのコピー）
