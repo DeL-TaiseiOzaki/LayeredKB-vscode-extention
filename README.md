@@ -159,6 +159,9 @@ npm version patch          # 0.1.0 → 0.1.1（package.json を更新しコミ�
 git push origin main --follow-tags
 ```
 
+タグを push しても Release が走らなかった場合（ワークフローが main に入る前にタグを push した場合など）は，
+GitHub の **Actions → Release → Run workflow** で「Use workflow from」にそのタグ（例: `v0.1.0`）を選んで手動実行できます．
+
 手元から直接公開する場合:
 
 ```bash
