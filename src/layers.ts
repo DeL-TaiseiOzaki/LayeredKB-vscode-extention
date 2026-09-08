@@ -86,12 +86,12 @@ export const DEFAULT_LAYERS: LayerDefinition[] = [
 	{
 		id: 'raw',
 		label: 'Raw データ層',
-		description: 'Google Drive などの生データ置き場（Git 管理外）．roots にフォルダを設定する',
+		description:
+			'生データ置き場（contents/ などのマウント先）．外部フォルダを走査するには roots にフォルダを，patterns に "**/*" を設定する',
 		icon: 'database',
 		badge: 'R',
 		color: 'charts.green',
-		patterns: ['**/*'],
-		roots: [],
+		patterns: ['contents/**', 'raw/**', 'data/**', 'attachments/**'],
 	},
 ];
 
@@ -142,9 +142,23 @@ export function normalizePattern(pattern: string): string {
 	return pattern.trim().replace(/\\/g, '/').replace(/^(\.\/|\/)+/, '');
 }
 
-/** ワークスペース外のフォルダを走査するレイヤーかどうか */
+/**
+ * `roots` を宣言しているレイヤーかどうか（＝ワークスペース内ファイルの分類に参加しない）．
+ *
+ * 空配列でも真になる．`roots: []` は「外部フォルダ専用だが走査先が未設定」という
+ * 明示的に無効な状態を表し，ワークスペース内の分類に落ちてカタチが変わることはない．
+ * 実際に走査するものがあるかは {@link hasUsableExternalRoots} で別に判定する．
+ */
 export function hasExternalRoots(layer: LayerDefinition): boolean {
 	return Array.isArray(layer.roots);
+}
+
+/** 実際に走査できる `roots`（空白でない文字列）が 1 つ以上あるか */
+export function hasUsableExternalRoots(layer: LayerDefinition): boolean {
+	if (!Array.isArray(layer.roots)) {
+		return false;
+	}
+	return layer.roots.some((root) => typeof root === 'string' && root.trim().length > 0);
 }
 
 /** レイヤー定義の妥当性を検証し，問題があれば理由を返す */

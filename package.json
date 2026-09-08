@@ -309,14 +309,16 @@
 						{
 							"id": "raw",
 							"label": "Raw データ層",
-							"description": "Google Drive などの生データ置き場（Git 管理外）．roots にフォルダを設定する",
+							"description": "生データ置き場（contents/ などのマウント先）．外部フォルダを走査するには roots にフォルダを，patterns に \"**/*\" を設定する",
 							"icon": "database",
 							"badge": "R",
 							"color": "charts.green",
 							"patterns": [
-								"**/*"
-							],
-							"roots": []
+								"contents/**",
+								"raw/**",
+								"data/**",
+								"attachments/**"
+							]
 						}
 					],
 					"items": {
@@ -364,7 +366,7 @@
 								"items": {
 									"type": "string"
 								},
-								"description": "走査するフォルダ（絶対パス，~，またはワークスペース相対パス）．指定するとこのレイヤーはワークスペース内ファイルの分類に参加しません．Google Drive など Git 管理外の置き場に使います"
+								"description": "走査するフォルダ（絶対パス，~，またはワークスペース相対パス）．指定するとこのレイヤーはワークスペース内ファイルの分類に参加せず，patterns はフォルダ内の相対パスに対して評価されます（フォルダ全体を取り込むなら \"**/*\"）．空配列にするとこのレイヤーは何も表示しません"
 							}
 						}
 					}
@@ -396,6 +398,11 @@
 					"type": "boolean",
 					"default": true,
 					"description": "標準エクスプローラー上のファイルにレイヤーのバッジと色を付ける"
+				},
+				"layeredkb.followSymlinks": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "レイヤーの `roots` に指定した外部フォルダを走査するとき，中のシンボリックリンクを辿る．Google Drive のマウントをリンクで置いている場合に有効にする．循環参照は検出して打ち切り，深さとエントリ数にも上限を設けるが，リンクの先が巨大なフォルダだと走査に時間がかかる．`roots` に直接指定したフォルダ自体は，この設定に関わらず常に辿られる"
 				}
 			}
 		}

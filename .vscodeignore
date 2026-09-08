@@ -13,3 +13,14 @@ images/icon.svg
 **/*.map
 **/*.ts
 **/*.vsix
+
+# エージェント運用基盤（利用者には不要）
+.claude/**
+.agents/**
+.codex/**
+scripts/**
+AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
+PROGRESS.md
+.orchestra-backup-*/**
