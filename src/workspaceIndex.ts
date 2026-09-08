@@ -1,7 +1,8 @@
+import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { LayeredKbConfig, readConfig } from './config';
+import { CONFIG_SECTION, LayeredKbConfig, readConfig } from './config';
 import {
 	ClassificationResult,
 	ClassifiedFile,
@@ -9,8 +10,10 @@ import {
 	compileMatcher,
 	filterExternalFiles,
 	hasExternalRoots,
+	hasUsableExternalRoots,
 	LayerDefinition,
 } from './layers';
+import { walkDirectory, WalkDiagnostics, WalkPort } from './walk';
 
 /**
  * ワークスペース（と各レイヤーの外部フォルダ）を走査してレイヤー分類を保持する．
@@ -27,6 +30,7 @@ export class WorkspaceIndex implements vscode.Disposable {
 	private _dirty = false;
 	private _debounce: NodeJS.Timeout | undefined;
 	private _externalWatchers: vscode.Disposable[] = [];
+	private _warned = new Set<string>();
 	private readonly _disposables: vscode.Disposable[] = [];
 
 	constructor() {
@@ -63,6 +67,8 @@ export class WorkspaceIndex implements vscode.Disposable {
 	/** 設定を読み直してから再走査する */
 	reloadConfig(): Promise<void> {
 		this._config = readConfig();
+		// 設定を直したら診断も出し直す
+		this._warned = new Set<string>();
 		return this.refresh();
 	}
 
@@ -101,14 +107,30 @@ export class WorkspaceIndex implements vscode.Disposable {
 		const workspaceFiles = await this.scanWorkspace(uris);
 		const result = classifyFiles(workspaceFiles, this._config.layers);
 
+		const followSymlinks = readFollowSymlinks();
+
 		const externalRoots: vscode.Uri[] = [];
 		for (const layer of this._config.layers) {
 			if (!hasExternalRoots(layer)) {
 				continue;
 			}
+			if (!hasUsableExternalRoots(layer)) {
+				this.warnOnce(
+					`unconfigured:${layer.id}`,
+					`LayeredKB: レイヤー「${layer.label}」は外部フォルダ専用ですが roots が空です．layeredkb.layers で走査するフォルダを設定してください．`
+				);
+				continue;
+			}
 			const roots = resolveRoots(layer.roots ?? []);
+			if (roots.length === 0) {
+				this.warnOnce(
+					`unresolved:${layer.id}`,
+					`LayeredKB: レイヤー「${layer.label}」の roots を解決できませんでした．相対パスはフォルダーを開いてから解決されます．`
+				);
+				continue;
+			}
 			externalRoots.push(...roots);
-			const found = await this.scanExternal(layer, roots, uris);
+			const found = await this.scanExternal(layer, roots, uris, followSymlinks);
 			const files = filterExternalFiles(found, layer);
 			result.byLayer.set(layer.id, files);
 			for (const f of files) {
@@ -145,7 +167,8 @@ export class WorkspaceIndex implements vscode.Disposable {
 	private async scanExternal(
 		layer: LayerDefinition,
 		roots: vscode.Uri[],
-		uris: Map<string, vscode.Uri>
+		uris: Map<string, vscode.Uri>,
+		followSymlinks: boolean
 	): Promise<ClassifiedFile[]> {
 		const excluded = compileMatcher(this._config.exclude);
 		const multi = roots.length > 1;
@@ -153,16 +176,61 @@ export class WorkspaceIndex implements vscode.Disposable {
 		for (const root of roots) {
 			const rootLabel = multi ? path.basename(root.fsPath) || root.fsPath : undefined;
 			try {
-				await walk(root, '', excluded, (uri, relativePath) => {
-					const key = uri.toString();
-					uris.set(key, uri);
-					files.push({ key, relativePath, rootLabel });
+				const diagnostics = await walkDirectory(createWalkPort(root), {
+					followSymlinks,
+					excluded,
+					visit: (relativePath) => {
+						const uri = childUri(root, relativePath);
+						const key = uri.toString();
+						uris.set(key, uri);
+						files.push({ key, relativePath, rootLabel });
+					},
 				});
+				this.reportWalk(layer, root, diagnostics, followSymlinks);
 			} catch (err) {
 				console.warn(`[LayeredKB] レイヤー "${layer.id}" の roots を読めません: ${root.fsPath}`, err);
 			}
 		}
 		return files;
+	}
+
+	/** 走査結果の診断を利用者に伝える．空パネル・欠落の理由を黙って隠さないための経路． */
+	private reportWalk(
+		layer: LayerDefinition,
+		root: vscode.Uri,
+		diagnostics: WalkDiagnostics,
+		followSymlinks: boolean
+	): void {
+		const where = `レイヤー「${layer.label}」の ${root.fsPath}`;
+		if (!followSymlinks && diagnostics.skippedSymlinks > 0) {
+			this.warnOnce(
+				`symlink:${layer.id}:${root.toString()}`,
+				`LayeredKB: ${where} でシンボリックリンク ${diagnostics.skippedSymlinks} 件をスキップしました．` +
+					`Google Drive などのマウントを取り込むには layeredkb.followSymlinks を有効にしてください．`
+			);
+		}
+		if (diagnostics.truncatedBy !== undefined) {
+			this.warnOnce(
+				`truncated:${layer.id}:${root.toString()}`,
+				`LayeredKB: ${where} の走査を上限（${diagnostics.truncatedBy}）で打ち切りました．` +
+					`一部のファイルは表示されません: ${diagnostics.truncatedAt}`
+			);
+		}
+		if (diagnostics.cycles > 0 || diagnostics.unresolvedSymlinks > 0) {
+			console.warn(
+				`[LayeredKB] ${where}: 循環 ${diagnostics.cycles} 件，解決できないリンク ${diagnostics.unresolvedSymlinks} 件をスキップしました．`
+			);
+		}
+	}
+
+	/** 同じ理由の警告は 1 度だけ出す（走査のたびに通知しないため） */
+	private warnOnce(key: string, message: string): void {
+		if (this._warned.has(key)) {
+			return;
+		}
+		this._warned.add(key);
+		console.warn(`[LayeredKB] ${message}`);
+		void vscode.window.showWarningMessage(message);
 	}
 
 	private watchExternalRoots(roots: vscode.Uri[]): void {
@@ -214,30 +282,59 @@ export function resolveRoots(roots: string[]): vscode.Uri[] {
 	return resolved;
 }
 
-async function walk(
-	dir: vscode.Uri,
-	prefix: string,
-	excluded: (relativePath: string) => boolean,
-	visit: (uri: vscode.Uri, relativePath: string) => void
-): Promise<void> {
-	const entries = await vscode.workspace.fs.readDirectory(dir);
-	for (const [name, type] of entries) {
-		const relativePath = prefix ? `${prefix}/${name}` : name;
-		const uri = vscode.Uri.joinPath(dir, name);
-		if (type & vscode.FileType.SymbolicLink) {
-			continue;
-		}
-		if (type & vscode.FileType.Directory) {
-			if (excluded(`${relativePath}/`) || excluded(relativePath)) {
-				continue;
+/** `layeredkb.followSymlinks` の既定値．従来どおりリンクをスキップする． */
+export const DEFAULT_FOLLOW_SYMLINKS = false;
+
+/**
+ * `layeredkb.followSymlinks` を読む．
+ *
+ * 本来は `LayeredKbConfig` に載せるべき設定だが，今回の修正では `config.ts` を
+ * 変更しない方針のためここで直接読む（`affectsConfig` は `layeredkb.*` 全体を
+ * 見ているので，変更時の再走査は従来どおり働く）．
+ */
+function readFollowSymlinks(): boolean {
+	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return cfg.get<boolean>('followSymlinks') ?? DEFAULT_FOLLOW_SYMLINKS;
+}
+
+/** ルートからの相対パス（`/` 区切り）を URI にする */
+function childUri(root: vscode.Uri, relativePath: string): vscode.Uri {
+	return relativePath ? vscode.Uri.joinPath(root, ...relativePath.split('/')) : root;
+}
+
+/** VS Code のファイルシステム API を {@link WalkPort} に適合させる */
+function createWalkPort(root: vscode.Uri): WalkPort {
+	const rootFsPath = root.fsPath;
+	// realpath は Node のファイルシステムを見るので file スキームでのみ意味を持つ．
+	// 解決できない場合 walkDirectory はリンクを辿らないので，循環検出は常に有効なまま．
+	const canResolve = root.scheme === 'file';
+	return {
+		async readDirectory(relativePath) {
+			const entries = await vscode.workspace.fs.readDirectory(childUri(root, relativePath));
+			// readDirectory はリンク先の種別を解決済みで返す（SymbolicLink | Directory など）ので，
+			// 種別を知るための stat を自前で足す必要はない．
+			return entries.map(([name, type]) => ({
+				name,
+				isFile: (type & vscode.FileType.File) !== 0,
+				isDirectory: (type & vscode.FileType.Directory) !== 0,
+				isSymbolicLink: (type & vscode.FileType.SymbolicLink) !== 0,
+			}));
+		},
+		async realPath(relativePath) {
+			if (!canResolve) {
+				return undefined;
 			}
-			await walk(uri, relativePath, excluded, visit);
-		} else if (type & vscode.FileType.File) {
-			if (!excluded(relativePath)) {
-				visit(uri, relativePath);
+			const native = relativePath ? path.join(rootFsPath, ...relativePath.split('/')) : rootFsPath;
+			try {
+				return await fs.realpath(native);
+			} catch {
+				return undefined;
 			}
-		}
-	}
+		},
+		childPath(parentRealPath, name) {
+			return path.join(parentRealPath, name);
+		},
+	};
 }
 
 function toPosix(p: string): string {

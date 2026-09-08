@@ -7,6 +7,7 @@ import {
 	DEFAULT_LAYERS,
 	filterExternalFiles,
 	hasExternalRoots,
+	hasUsableExternalRoots,
 	LayerDefinition,
 	OTHER_LAYER_ID,
 	validateLayers,
@@ -44,11 +45,39 @@ suite('layers: classifyFiles', () => {
 		assert.strictEqual(layerOfFile.get('src/index.ts'), OTHER_LAYER_ID);
 	});
 
-	test('roots を持つレイヤー（Raw）はワークスペース内ファイルを取り込まない', () => {
-		const { byLayer } = classifyFiles([file('src/index.ts'), file('data/x.bin')], DEFAULT_LAYERS);
+	test('roots を持つレイヤーはワークスペース内ファイルを取り込まない', () => {
+		const layers: LayerDefinition[] = [
+			{ id: 'knowledge', label: 'Knowledge', patterns: ['**/*.md'] },
+			{ id: 'raw', label: 'Raw', patterns: ['**/*'], roots: ['~/Drive'] },
+		];
+		const { byLayer } = classifyFiles([file('src/index.ts'), file('notes/a.md')], layers);
 		assert.deepStrictEqual(byLayer.get('raw'), []);
-		assert.strictEqual(byLayer.get(OTHER_LAYER_ID)!.length, 2);
-		assert.ok(hasExternalRoots(DEFAULT_LAYERS.find((l) => l.id === 'raw')!));
+		assert.deepStrictEqual(byLayer.get(OTHER_LAYER_ID)!.map((f) => f.relativePath), ['src/index.ts']);
+		assert.ok(hasExternalRoots(layers[1]));
+	});
+
+	test('roots が空のレイヤーもワークスペース内ファイルを取り込まない（明示的に無効な状態）', () => {
+		const layers: LayerDefinition[] = [{ id: 'raw', label: 'Raw', patterns: ['**/*'], roots: [] }];
+		const { byLayer } = classifyFiles([file('src/index.ts')], layers);
+		assert.deepStrictEqual(byLayer.get('raw'), []);
+		// 「全部を飲み込む catch-all」に化けないことが互換性上の要点
+		assert.deepStrictEqual(byLayer.get(OTHER_LAYER_ID)!.map((f) => f.relativePath), ['src/index.ts']);
+	});
+
+	test('既定の Raw レイヤーは roots を持たず，マウント先ディレクトリを分類する', () => {
+		const raw = DEFAULT_LAYERS.find((l) => l.id === 'raw')!;
+		assert.strictEqual(hasExternalRoots(raw), false);
+		const { byLayer } = classifyFiles(
+			[file('contents/drive/scan.pdf'), file('data/x.bin'), file('src/index.ts'), file('contents/notes.md')],
+			DEFAULT_LAYERS
+		);
+		assert.deepStrictEqual(
+			byLayer.get('raw')!.map((f) => f.relativePath),
+			['contents/drive/scan.pdf', 'data/x.bin']
+		);
+		// first-match-wins なので contents/ 配下の Markdown は先にナレッジ層が取る
+		assert.deepStrictEqual(byLayer.get('knowledge')!.map((f) => f.relativePath), ['contents/notes.md']);
+		assert.deepStrictEqual(byLayer.get(OTHER_LAYER_ID)!.map((f) => f.relativePath), ['src/index.ts']);
 	});
 
 	test('先に定義したレイヤーが優先される（first-match-wins）', () => {
@@ -104,6 +133,30 @@ suite('layers: validateLayers', () => {
 			{ id: 'c', label: 'c', patterns: ['**'], roots: '~/x' as unknown as string[] },
 		]);
 		assert.strictEqual(problems.length, 4);
+	});
+});
+
+suite('layers: hasUsableExternalRoots', () => {
+	test('空配列・空文字列だけの roots は「走査先なし」と判定される', () => {
+		const base = { id: 'raw', label: 'Raw', patterns: ['**/*'] };
+		assert.strictEqual(hasUsableExternalRoots({ ...base, roots: [] }), false);
+		assert.strictEqual(hasUsableExternalRoots({ ...base, roots: ['', '   '] }), false);
+		assert.strictEqual(hasUsableExternalRoots(base), false);
+	});
+
+	test('空白でない roots が 1 つでもあれば走査対象になる', () => {
+		const base = { id: 'raw', label: 'Raw', patterns: ['**/*'] };
+		assert.strictEqual(hasUsableExternalRoots({ ...base, roots: ['', '~/Drive'] }), true);
+	});
+
+	test('roots が配列でない場合も走査対象にしない', () => {
+		const layer: LayerDefinition = {
+			id: 'raw',
+			label: 'Raw',
+			patterns: ['**/*'],
+			roots: '~/Drive' as unknown as string[],
+		};
+		assert.strictEqual(hasUsableExternalRoots(layer), false);
 	});
 });
 
