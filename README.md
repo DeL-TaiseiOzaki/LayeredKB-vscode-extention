@@ -151,12 +151,28 @@ src/
 
 ### リリース手順
 
-`package.json` の `version` を上げて main にマージし，同じ番号のタグを push します．
-Release ワークフローがビルド・テスト・パッケージ・Marketplace 公開・GitHub Release 作成まで行います．
+変更点を `CHANGELOG.md` の `## Unreleased` に書いてから，バージョンを上げて main にマージし，
+同じ番号のタグを push します．Release ワークフローがビルド・テスト・.vsix の内容検査・
+Marketplace 公開・GitHub Release 作成（本文は CHANGELOG の該当節）まで行います．
 
 ```bash
-npm version patch          # 0.1.0 → 0.1.1（package.json を更新しコミットとタグを作る）
-git push origin main --follow-tags
+./scripts/bump-version.sh minor --dry-run   # 何が変わるか先に確認する
+./scripts/bump-version.sh minor             # package.json / package-lock.json / CHANGELOG.md を更新
+git diff                                    # 差分を自分で確認する
+git add package.json package-lock.json CHANGELOG.md
+git commit -m "0.2.0"
+git tag v0.2.0
+git push origin HEAD
+git push origin v0.2.0                      # これが Marketplace への公開を起動する
+```
+
+`bump-version.sh` はコミットもタグも作りません（公開は取り消せないため，最後の一押しは人が行う）．
+作業ツリーが汚れている，`## Unreleased` が無い・空，バージョンが下がる場合は実行を拒否します．
+
+`.vsix` に入るファイルは許可リストで検査されます．手元で確認するには:
+
+```bash
+npm run compile && ./scripts/check-vsix-contents.sh
 ```
 
 タグを push しても Release が走らなかった場合（ワークフローが main に入る前にタグを push した場合など）は，
