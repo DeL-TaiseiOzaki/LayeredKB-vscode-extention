@@ -3,3 +3,12 @@ out/
 dist/
 *.vsix
 .vscode-test/
+
+# Claude Code Orchestra local state
+.claude/settings.local.json
+.claude/settings.orchestra.json
+.codex/config.orchestra.toml
+CLAUDE.local.md
+.claude/logs/
+.claude/checkpoints/
+.orchestra-backup-*/
