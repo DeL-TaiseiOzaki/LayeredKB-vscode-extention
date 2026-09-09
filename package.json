@@ -2,7 +2,7 @@
 	"name": "layeredkb",
 	"displayName": "LayeredKB",
 	"description": "Personal Knowledge Base のワークスペースを「スキーマ層 / オントロジー層 / ナレッジベース層 / Raw データ層」のパネルに分けて表示する VS Code 拡張機能．",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"license": "MIT",
 	"publisher": "del-taiseiozaki",
 	"repository": {
