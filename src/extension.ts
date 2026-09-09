@@ -3,6 +3,7 @@ import { affectsConfig } from './config';
 import { ExplorerDecorationProvider } from './explorerDecorations';
 import { LayerDefinition, OTHER_LAYER } from './layers';
 import { Element, LayerTreeProvider } from './layerTreeProvider';
+import { registerSpikeGrid } from './spike/register';
 import { WorkspaceIndex } from './workspaceIndex';
 
 /** package.json に静的に宣言してあるビュー枠の数（レイヤー数の上限） */
@@ -92,6 +93,10 @@ export function activate(context: vscode.ExtensionContext) {
 
 	applyLayers();
 	void index.refresh();
+
+	// SPIKE (2026-09-08): grid sidebar prototype, gated by layeredkb.spike.enableGrid (default off).
+	// The index is passed so the prototype can render the real workspace.
+	registerSpikeGrid(context, index);
 }
 
 export function deactivate() {}
