@@ -12,3 +12,7 @@ CLAUDE.local.md
 .claude/logs/
 .claude/checkpoints/
 .orchestra-backup-*/
+
+# Python bytecode cache（フック実行で生成される）
+__pycache__/
+*.pyc

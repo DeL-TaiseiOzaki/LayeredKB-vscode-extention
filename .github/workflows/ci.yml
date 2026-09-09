@@ -17,6 +17,8 @@ jobs:
       - run: npm ci
       - run: npm run compile
       - run: npm run test:unit
+      - name: Verify package contents
+        run: ./scripts/check-vsix-contents.sh
       - name: Package (dry run)
         run: npx @vscode/vsce package --out layeredkb.vsix
       - uses: actions/upload-artifact@v4
