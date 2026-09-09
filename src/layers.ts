@@ -7,6 +7,11 @@
  *
  * `roots` を持つレイヤーはワークスペース外のフォルダ（Google Drive など）を
  * 走査対象とし，ワークスペース内のファイルとは独立して分類される．
+ *
+ * 分類は「フレーム相対」である．スコープルート（個人ボールト本体，git submodule など）が
+ * その配下の分類を所有し，祖先はスコープルートの配下を分類しない．どのスコープルートが
+ * どのファイルを所有するかを決めるのは `scopes.ts` の仕事で，本モジュールは与えられた
+ * フレーム相対パス（{@link matchPath}）だけを見る．
  */
 import { minimatch } from 'minimatch';
 
@@ -46,18 +51,21 @@ export const DEFAULT_LAYERS: LayerDefinition[] = [
 		icon: 'law',
 		badge: 'S',
 		color: 'charts.purple',
+		// スキーマはスコープルート直下に固定する（`**/` を付けない）．
+		// 配下のスコープルート（submodule など）のスキーマはそのスコープ自身の
+		// スキーマ層に入るべきで，親のスキーマ層へ持ち上げてはならない．
 		patterns: [
 			'.claude/**',
 			'.claude.json',
-			'**/CLAUDE.md',
-			'**/CLAUDE.local.md',
-			'**/AGENTS.md',
+			'CLAUDE.md',
+			'CLAUDE.local.md',
+			'AGENTS.md',
 			'.agents/**',
 			'.codex/**',
 			'.cursor/**',
 			'.cursorrules',
 			'.gemini/**',
-			'**/GEMINI.md',
+			'GEMINI.md',
 			'.github/copilot-instructions.md',
 			'.github/instructions/**',
 			'.github/prompts/**',
@@ -104,15 +112,72 @@ export const OTHER_LAYER: LayerDefinition = {
 	patterns: [],
 };
 
+/** スコープルートの見つけ方 */
+export type ScopeKind =
+	/** ワークスペースフォルダ自身（個人ボールト） */
+	| 'workspace'
+	/** `.gitmodules` に宣言された git submodule */
+	| 'submodule';
+
+/**
+ * ファイルを所有するスコープルート．
+ *
+ * スコープルートは「配下の分類を所有するフォルダ」で，個人ボールト自身も
+ * その 1 つ（特別扱いはしない）．ここに載るのは表示と経路に必要な最小限で，
+ * 将来の宣言レジストリ（`.layeredkb/mounts.yaml`）が増やすのは `kind` の
+ * 値と付随するポリシーであって，この形ではない．
+ */
+export interface FileScope {
+	/** スコープルートの一意な ID（単一ルートのワークスペース自身は {@link WORKSPACE_SCOPE_ID}） */
+	id: string;
+	/** ワークスペースフォルダから見たスコープルートのパス（`/` 区切り，ワークスペース自身は空文字） */
+	path: string;
+	/** 表示名 */
+	label: string;
+	kind: ScopeKind;
+}
+
 /** 分類対象となる 1 ファイル */
 export interface ClassifiedFile {
 	/** ファイルを一意に識別するキー（URI 文字列など） */
 	key: string;
-	/** ルートからの相対パス（区切りは `/`） */
+	/** ルートからの相対パス（区切りは `/`）．表示・ツリー構築に使う */
 	relativePath: string;
 	/** 複数ルート時にツリーの先頭に置くルート名（単一ルートなら undefined） */
 	rootLabel?: string;
+	/**
+	 * このファイルを所有するスコープルート．
+	 *
+	 * ワークスペース内のファイルには `scopes.ts` の分配（`attachScopes`）が必ず入れる．
+	 * 未指定は「まだ埋めていない」ではなく「どのフレームにも属さない」を意味し，
+	 * レイヤーの `roots` から拾った外部フォルダのファイル（{@link filterExternalFiles}）が
+	 * これに当たる．スコープが確定した型は {@link ScopedFile}．
+	 */
+	scope?: FileScope;
+	/**
+	 * スコープルートからの相対パス．レイヤー判定はこのパスに対して行う．
+	 * 未指定なら {@link relativePath}（＝ワークスペース全体を 1 フレームと見なす）．
+	 */
+	scopePath?: string;
 }
+
+/**
+ * スコープが解決済みのファイル．作れるのは `scopes.ts` の `attachScopes` だけで，
+ * 「ワークスペース内のファイルは必ず所有スコープを持つ」という不変条件を型で表す．
+ */
+export type ScopedFile = ClassifiedFile & { scope: FileScope; scopePath: string };
+
+/** ワークスペースフォルダ自身を表すスコープ ID（複数ルート時はルート名になる） */
+export const WORKSPACE_SCOPE_ID = '.';
+
+/**
+ * 交換面（ホストが外部とやり取りするための面）のディレクトリ名．
+ *
+ * 各スコープルート直下のこのディレクトリは「置かれている場所」で定義される面であり，
+ * 中身のファイル種別で分類してはならない．将来 `.layeredkb/mounts.yaml` が
+ * マウント点を宣言するようになっても，既定の面がこの名前である点は変わらない．
+ */
+export const EXCHANGE_SURFACE_DIR = 'contents';
 
 export interface ClassificationResult {
 	/** レイヤー ID → そのレイヤーに属するファイル（相対パス順） */
@@ -187,15 +252,51 @@ export function validateLayers(layers: LayerDefinition[]): string[] {
 	return problems;
 }
 
+/** レイヤー判定に使うフレーム相対パス（スコープ未解決なら従来どおりルート相対） */
+export function matchPath(file: ClassifiedFile): string {
+	return file.scopePath ?? file.relativePath;
+}
+
+/** フレーム相対パスが交換面（`contents/`）の中にあるか */
+export function isUnderExchangeSurface(framePath: string): boolean {
+	return framePath.startsWith(`${EXCHANGE_SURFACE_DIR}/`);
+}
+
 /**
- * ワークスペース内のファイル群をレイヤーに分類する．`roots` を持つレイヤーは
- * 対象外（外部フォルダ専用）．レイヤーは定義順に評価され，最初に一致した
- * レイヤーが採用される．どれにも一致しない場合は OTHER_LAYER_ID に入る．
+ * 交換面を自分のものだと宣言しているレイヤーの ID．
+ *
+ * 「`contents/` 直下の何かに一致するパターンを持つ最初のレイヤー」であり，既定では
+ * Raw データ層．複数が宣言していれば先勝ちで，他のパターン衝突と同じ規則に従う．
+ *
+ * 宣言するレイヤーが 1 つも無い設定では undefined を返し，その場合だけ交換面の除外は
+ * 働かない．今の段階で「ここが交換面である」という宣言はレイヤー定義しかなく，
+ * 宣言していない利用者にとって `contents/` はただのフォルダだからである
+ * （`.layeredkb/mounts.yaml` が入ったらそちらが宣言源になる）．
+ */
+export function findExchangeLayerId(layers: LayerDefinition[]): string | undefined {
+	const claims = (layer: LayerDefinition): boolean =>
+		layer.patterns.some((pattern) => {
+			const normalized = normalizePattern(pattern);
+			return normalized === EXCHANGE_SURFACE_DIR || normalized.startsWith(`${EXCHANGE_SURFACE_DIR}/`);
+		});
+	return layers.filter((layer) => !hasExternalRoots(layer)).find(claims)?.id;
+}
+
+/**
+ * 1 つのフレーム（スコープルート）の中でファイル群をレイヤーに分類する．
+ * `roots` を持つレイヤーは対象外（外部フォルダ専用）．レイヤーは定義順に評価され，
+ * 最初に一致したレイヤーが採用される．どれにも一致しない場合は OTHER_LAYER_ID に入る．
+ *
+ * 判定に使うのは {@link matchPath}（= `scopePath ?? relativePath`）で，
+ * 交換面（`contents/`）の中のファイルはパターン照合を行わず，
+ * {@link findExchangeLayerId} のレイヤーにそのまま入る．
+ * 複数のスコープルートにまたがるファイル群は `scopes.ts` の `classifyByScope` を使う．
  */
 export function classifyFiles(files: ClassifiedFile[], layers: LayerDefinition[]): ClassificationResult {
 	const matchers = layers
 		.filter((layer) => !hasExternalRoots(layer))
 		.map((layer) => ({ id: layer.id, matches: compileLayerMatcher(layer) }));
+	const exchangeLayerId = findExchangeLayerId(layers);
 	const byLayer = new Map<string, ClassifiedFile[]>();
 	for (const layer of layers) {
 		byLayer.set(layer.id, []);
@@ -204,8 +305,7 @@ export function classifyFiles(files: ClassifiedFile[], layers: LayerDefinition[]
 	const layerOfFile = new Map<string, string>();
 
 	for (const file of files) {
-		const hit = matchers.find((m) => m.matches(file.relativePath));
-		const id = hit ? hit.id : OTHER_LAYER_ID;
+		const id = layerIdOf(matchPath(file), matchers, exchangeLayerId);
 		byLayer.get(id)!.push(file);
 		layerOfFile.set(file.key, id);
 	}
@@ -216,6 +316,19 @@ export function classifyFiles(files: ClassifiedFile[], layers: LayerDefinition[]
 	return { byLayer, layerOfFile };
 }
 
+/** フレーム相対パス 1 件のレイヤー ID を決める */
+function layerIdOf(
+	framePath: string,
+	matchers: { id: string; matches: (relativePath: string) => boolean }[],
+	exchangeLayerId: string | undefined
+): string {
+	if (exchangeLayerId !== undefined && isUnderExchangeSurface(framePath)) {
+		return exchangeLayerId;
+	}
+	const hit = matchers.find((m) => m.matches(framePath));
+	return hit ? hit.id : OTHER_LAYER_ID;
+}
+
 /** 外部フォルダから見つかったファイルのうち，レイヤーの patterns に一致するものを返す */
 export function filterExternalFiles(files: ClassifiedFile[], layer: LayerDefinition): ClassifiedFile[] {
 	const matches = compileLayerMatcher(layer);
@@ -224,7 +337,8 @@ export function filterExternalFiles(files: ClassifiedFile[], layer: LayerDefinit
 	return result;
 }
 
-function sortFiles(list: ClassifiedFile[]): void {
+/** ツリー上のパス順に並べ替える（分類結果の並びはこの順で安定させる） */
+export function sortFiles(list: ClassifiedFile[]): void {
 	list.sort((a, b) => (treePath(a) < treePath(b) ? -1 : treePath(a) > treePath(b) ? 1 : 0));
 }
 

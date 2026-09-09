@@ -6,13 +6,15 @@ import { CONFIG_SECTION, LayeredKbConfig, readConfig } from './config';
 import {
 	ClassificationResult,
 	ClassifiedFile,
-	classifyFiles,
 	compileMatcher,
+	EXCHANGE_SURFACE_DIR,
 	filterExternalFiles,
 	hasExternalRoots,
 	hasUsableExternalRoots,
 	LayerDefinition,
 } from './layers';
+import { collectMountPoints, MountObservation, MountPoint, mountDisplayPath } from './mounts';
+import { buildScopeRoots, classifyByScope, parseGitmodulePaths, ScopeRoot } from './scopes';
 import { walkDirectory, WalkDiagnostics, WalkPort } from './walk';
 
 /**
@@ -25,6 +27,8 @@ export class WorkspaceIndex implements vscode.Disposable {
 
 	private _config: LayeredKbConfig = readConfig();
 	private _result: ClassificationResult = { byLayer: new Map(), layerOfFile: new Map() };
+	private _scopes: ScopeRoot[] = [];
+	private _mounts: MountPoint[] = [];
 	private _uris = new Map<string, vscode.Uri>();
 	private _pending: Promise<void> | undefined;
 	private _dirty = false;
@@ -50,6 +54,16 @@ export class WorkspaceIndex implements vscode.Disposable {
 
 	get result(): ClassificationResult {
 		return this._result;
+	}
+
+	/** 検出済みのスコープルート（ワークスペースフォルダ自身と git submodule） */
+	get scopes(): readonly ScopeRoot[] {
+		return this._scopes;
+	}
+
+	/** 交換面（`contents/`）直下のマウント点と，その状態 */
+	get mounts(): readonly MountPoint[] {
+		return this._mounts;
 	}
 
 	filesOf(layerId: string): ClassifiedFile[] {
@@ -104,8 +118,12 @@ export class WorkspaceIndex implements vscode.Disposable {
 
 	private async scan(): Promise<void> {
 		const uris = new Map<string, vscode.Uri>();
+		const folders = vscode.workspace.workspaceFolders ?? [];
+		const scopes = await detectScopeRoots(folders);
+		const mounts = await detectMounts(folders);
 		const workspaceFiles = await this.scanWorkspace(uris);
-		const result = classifyFiles(workspaceFiles, this._config.layers);
+		const result = classifyByScope(workspaceFiles, scopes, this._config.layers);
+		this.reportMounts(mounts);
 
 		const followSymlinks = readFollowSymlinks();
 
@@ -140,6 +158,8 @@ export class WorkspaceIndex implements vscode.Disposable {
 
 		this._uris = uris;
 		this._result = result;
+		this._scopes = scopes;
+		this._mounts = mounts;
 		this.watchExternalRoots(externalRoots);
 		this._onDidChange.fire();
 	}
@@ -192,6 +212,36 @@ export class WorkspaceIndex implements vscode.Disposable {
 			}
 		}
 		return files;
+	}
+
+	/**
+	 * 繋がっていないマウント点と，マウントの位置にあるローカルデータを利用者に伝える．
+	 * `findFiles` は辿れない入口を黙って無視するので，何も言わなければ
+	 * 「マウントされていない」と「空」が見分けられない．ローカルデータの方は逆に
+	 * 普通のフォルダとして黙って表示されてしまい，バックアップされていないことが見えない．
+	 */
+	private reportMounts(mounts: readonly MountPoint[]): void {
+		for (const mount of mounts) {
+			const where = mountDisplayPath(mount);
+			if (mount.state === 'unavailable') {
+				this.warnOnce(
+					`mount-unavailable:${where}`,
+					`LayeredKB: ${where} はこの端末にマウントされていません（参照先が見つかりません）．` +
+						`中身は表示されません．`
+				);
+				continue;
+			}
+			if (mount.state === 'local-data') {
+				this.warnOnce(
+					`mount-local-data:${where}`,
+					`LayeredKB: ${where} はマウントではなく，この端末のローカルディレクトリとして見えています` +
+						`（交換面と同じディスク上の実体で，マウント境界がありません）．` +
+						`マウントに失敗したまま実体が作られた可能性があります．` +
+						`${EXCHANGE_SURFACE_DIR}/ はバージョン管理の対象外なので，この中のデータは` +
+						`この端末にしか存在せず，どこにもバックアップされていません．`
+				);
+			}
+		}
 	}
 
 	/** 走査結果の診断を利用者に伝える．空パネル・欠落の理由を黙って隠さないための経路． */
@@ -256,6 +306,95 @@ export class WorkspaceIndex implements vscode.Disposable {
 		}
 		vscode.Disposable.from(...this._externalWatchers, ...this._disposables).dispose();
 	}
+}
+
+/**
+ * ワークスペースフォルダごとにスコープルートを検出する．
+ * 検出源は `.gitmodules` だけ（宣言レジストリは後の段階）．読めなければ
+ * そのフォルダ自身の 1 スコープになる．
+ */
+export async function detectScopeRoots(folders: readonly vscode.WorkspaceFolder[]): Promise<ScopeRoot[]> {
+	const multiRoot = folders.length > 1;
+	const scopes: ScopeRoot[] = [];
+	for (const folder of folders) {
+		const submodulePaths = await readGitmodulePaths(folder.uri);
+		scopes.push(
+			...buildScopeRoots({
+				rootLabel: multiRoot ? folder.name : undefined,
+				label: folder.name,
+				submodulePaths,
+			})
+		);
+	}
+	return scopes;
+}
+
+async function readGitmodulePaths(folder: vscode.Uri): Promise<string[]> {
+	try {
+		const bytes = await vscode.workspace.fs.readFile(vscode.Uri.joinPath(folder, '.gitmodules'));
+		return parseGitmodulePaths(new TextDecoder().decode(bytes));
+	} catch {
+		// .gitmodules が無いのは普通の状態なので黙って空扱いにする
+		return [];
+	}
+}
+
+/**
+ * 交換面（`contents/`）直下のマウント点を調べる．交換面が無ければ空．
+ *
+ * 直下のエントリは種別を問わずすべてマウント点として扱う（`src/mounts.ts` の方針）．
+ * ここでの観測は「繋がっているか」を決めるためだけのもので，そのために
+ * 種別ビットに加えてデバイス ID を添える．
+ */
+export async function detectMounts(folders: readonly vscode.WorkspaceFolder[]): Promise<MountPoint[]> {
+	const multiRoot = folders.length > 1;
+	const mounts: MountPoint[] = [];
+	for (const folder of folders) {
+		const surface = vscode.Uri.joinPath(folder.uri, EXCHANGE_SURFACE_DIR);
+		let entries: [string, vscode.FileType][];
+		try {
+			entries = await vscode.workspace.fs.readDirectory(surface);
+		} catch {
+			// 交換面が無いワークスペースはマウント点も無い
+			continue;
+		}
+		const surfaceDevice = await deviceIdOf(surface);
+		const observations: MountObservation[] = [];
+		for (const [name, type] of entries) {
+			observations.push({
+				name,
+				type,
+				onSeparateDevice: await isOnSeparateDevice(vscode.Uri.joinPath(surface, name), surfaceDevice),
+			});
+		}
+		mounts.push(...collectMountPoints(observations, EXCHANGE_SURFACE_DIR, multiRoot ? folder.name : undefined));
+	}
+	return mounts;
+}
+
+/**
+ * そのパスが載っているファイルシステムのデバイス ID．
+ * `file` スキーム以外（リモート・仮想ファイルシステム）と，辿れないパスでは観測できない．
+ */
+async function deviceIdOf(uri: vscode.Uri): Promise<number | undefined> {
+	if (uri.scheme !== 'file') {
+		return undefined;
+	}
+	try {
+		// stat はリンクを辿る．マウントポイント自身のデバイスを見たいので lstat ではない．
+		return (await fs.stat(uri.fsPath)).dev;
+	} catch {
+		return undefined;
+	}
+}
+
+/** 交換面とは別のデバイスに載っているか．どちらかが観測できなければ undefined． */
+async function isOnSeparateDevice(entry: vscode.Uri, surfaceDevice: number | undefined): Promise<boolean | undefined> {
+	if (surfaceDevice === undefined) {
+		return undefined;
+	}
+	const device = await deviceIdOf(entry);
+	return device === undefined ? undefined : device !== surfaceDevice;
 }
 
 /** `~` やワークスペース相対パスを解決して URI にする */
