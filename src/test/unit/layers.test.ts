@@ -6,9 +6,12 @@ import {
 	compileLayerMatcher,
 	DEFAULT_LAYERS,
 	filterExternalFiles,
+	findExchangeLayerId,
 	hasExternalRoots,
 	hasUsableExternalRoots,
+	isUnderExchangeSurface,
 	LayerDefinition,
+	matchPath,
 	OTHER_LAYER_ID,
 	validateLayers,
 } from '../../layers';
@@ -23,7 +26,7 @@ suite('layers: classifyFiles', () => {
 			file('.claude/settings.json'),
 			file('.claude/commands/review.md'),
 			file('AGENTS.md'),
-			file('docs/CLAUDE.md'),
+			file('CLAUDE.md'),
 			file('ontology/terms.csv'),
 			file('notes/2026/idea.md'),
 			file('src/index.ts'),
@@ -33,7 +36,7 @@ suite('layers: classifyFiles', () => {
 
 		assert.deepStrictEqual(
 			byLayer.get('schema')!.map((f) => f.relativePath),
-			['.claude/commands/review.md', '.claude/settings.json', 'AGENTS.md', 'docs/CLAUDE.md']
+			['.claude/commands/review.md', '.claude/settings.json', 'AGENTS.md', 'CLAUDE.md']
 		);
 		assert.deepStrictEqual(byLayer.get('ontology')!.map((f) => f.relativePath), ['ontology/terms.csv']);
 		assert.deepStrictEqual(
@@ -73,11 +76,52 @@ suite('layers: classifyFiles', () => {
 		);
 		assert.deepStrictEqual(
 			byLayer.get('raw')!.map((f) => f.relativePath),
-			['contents/drive/scan.pdf', 'data/x.bin']
+			['contents/drive/scan.pdf', 'contents/notes.md', 'data/x.bin']
 		);
-		// first-match-wins なので contents/ 配下の Markdown は先にナレッジ層が取る
-		assert.deepStrictEqual(byLayer.get('knowledge')!.map((f) => f.relativePath), ['contents/notes.md']);
+		assert.deepStrictEqual(byLayer.get('knowledge'), []);
 		assert.deepStrictEqual(byLayer.get(OTHER_LAYER_ID)!.map((f) => f.relativePath), ['src/index.ts']);
+	});
+
+	test('既定のスキーマ層はスコープルート直下に固定され，配下のスコープの CLAUDE.md を拾わない', () => {
+		// 欠陥 1: `**/CLAUDE.md` が固定されておらず，submodule のスキーマが親の層へ持ち上がっていた．
+		// スコープを解決しない素の呼び出しでは，配下の CLAUDE.md はスキーマ層に入らない．
+		const { layerOfFile } = classifyFiles(
+			[file('CLAUDE.md'), file('AGENTS.md'), file('team-kb/engineering/CLAUDE.md'), file('team-kb/engineering/AGENTS.md')],
+			DEFAULT_LAYERS
+		);
+		assert.strictEqual(layerOfFile.get('CLAUDE.md'), 'schema');
+		assert.strictEqual(layerOfFile.get('AGENTS.md'), 'schema');
+		assert.strictEqual(layerOfFile.get('team-kb/engineering/CLAUDE.md'), 'knowledge');
+		assert.strictEqual(layerOfFile.get('team-kb/engineering/AGENTS.md'), 'knowledge');
+	});
+
+	test('contents/ 配下はファイル種別で分類されず，交換面のレイヤーにまとまる', () => {
+		// 欠陥 3: contents/** は最後に宣言されているので，first-match-wins で
+		// マウント 1 つが 4 つのレイヤーに散っていた．
+		const { layerOfFile } = classifyFiles(
+			[
+				file('contents/gdrive/MyDrive/CLAUDE.md'),
+				file('contents/gdrive/MyDrive/note.md'),
+				file('contents/gdrive/Shared/data.csv'),
+				file('contents/gdrive/Shared/blob.bin'),
+			],
+			DEFAULT_LAYERS
+		);
+		assert.deepStrictEqual(
+			[...layerOfFile.values()],
+			['raw', 'raw', 'raw', 'raw']
+		);
+	});
+
+	test('scopePath があればそちらでレイヤーを判定する（フレーム相対）', () => {
+		const scoped: ClassifiedFile = {
+			key: 'team-kb/engineering/.claude/rules/house.md',
+			relativePath: 'team-kb/engineering/.claude/rules/house.md',
+			scopePath: '.claude/rules/house.md',
+		};
+		assert.strictEqual(matchPath(scoped), '.claude/rules/house.md');
+		const { layerOfFile } = classifyFiles([scoped], DEFAULT_LAYERS);
+		assert.strictEqual(layerOfFile.get(scoped.key), 'schema');
 	});
 
 	test('先に定義したレイヤーが優先される（first-match-wins）', () => {
@@ -94,6 +138,30 @@ suite('layers: classifyFiles', () => {
 		const { byLayer } = classifyFiles([], DEFAULT_LAYERS);
 		assert.deepStrictEqual([...byLayer.keys()], ['schema', 'ontology', 'knowledge', 'raw', OTHER_LAYER_ID]);
 		assert.deepStrictEqual(byLayer.get('schema'), []);
+	});
+});
+
+suite('layers: 交換面（contents/）', () => {
+	test('既定では Raw レイヤーが交換面を主張する', () => {
+		assert.strictEqual(findExchangeLayerId(DEFAULT_LAYERS), 'raw');
+		assert.ok(isUnderExchangeSurface('contents/gdrive/note.md'));
+		assert.ok(!isUnderExchangeSurface('contents.md'));
+		assert.ok(!isUnderExchangeSurface('knowledge/contents/note.md'));
+	});
+
+	test('contents/ を宣言するレイヤーが無ければ除外は働かない（消える層を作らない）', () => {
+		const layers: LayerDefinition[] = [{ id: 'knowledge', label: 'Knowledge', patterns: ['**/*.md'] }];
+		assert.strictEqual(findExchangeLayerId(layers), undefined);
+		const { layerOfFile } = classifyFiles([file('contents/gdrive/note.md')], layers);
+		assert.strictEqual(layerOfFile.get('contents/gdrive/note.md'), 'knowledge');
+	});
+
+	test('外部フォルダ専用レイヤー（roots つき）は交換面を主張できない', () => {
+		const layers: LayerDefinition[] = [
+			{ id: 'external', label: 'External', patterns: ['contents/**'], roots: ['~/Drive'] },
+			{ id: 'raw', label: 'Raw', patterns: ['contents/**'] },
+		];
+		assert.strictEqual(findExchangeLayerId(layers), 'raw');
 	});
 });
 

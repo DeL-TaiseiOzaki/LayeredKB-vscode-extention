@@ -95,6 +95,14 @@
 					"name": "Layer 8",
 					"when": "layeredkb.slot7.visible",
 					"contextualTitle": "LayeredKB"
+				},
+				{
+					"id": "layeredkb.spike.grid",
+					"type": "webview",
+					"initialSize": 12,
+					"name": "Grid Prototype (spike)",
+					"when": "config.layeredkb.spike.enableGrid",
+					"contextualTitle": "LayeredKB"
 				}
 			]
 		},
@@ -182,6 +190,21 @@
 				"command": "layeredkb.copyRelativePath",
 				"title": "Copy Relative Path",
 				"category": "LayeredKB"
+			},
+			{
+				"command": "layeredkb.spike.openGrid",
+				"title": "Open Grid Prototype (spike)",
+				"category": "LayeredKB"
+			},
+			{
+				"command": "layeredkb.spike.loadSynthetic",
+				"title": "Load Synthetic Vault into Grid Prototype (spike)",
+				"category": "LayeredKB"
+			},
+			{
+				"command": "layeredkb.spike.loadWorkspace",
+				"title": "Load Workspace into Grid Prototype (spike)",
+				"category": "LayeredKB"
 			}
 		],
 		"menus": {
@@ -205,6 +228,18 @@
 				{
 					"command": "layeredkb.copyRelativePath",
 					"when": "false"
+				},
+				{
+					"command": "layeredkb.spike.openGrid",
+					"when": "config.layeredkb.spike.enableGrid"
+				},
+				{
+					"command": "layeredkb.spike.loadSynthetic",
+					"when": "config.layeredkb.spike.enableGrid"
+				},
+				{
+					"command": "layeredkb.spike.loadWorkspace",
+					"when": "config.layeredkb.spike.enableGrid"
 				}
 			],
 			"view/title": [
@@ -252,7 +287,7 @@
 			"properties": {
 				"layeredkb.layers": {
 					"type": "array",
-					"markdownDescription": "レイヤーの定義．各レイヤーは独立したパネルとして表示されます（最大 8 個）．上から順に評価され，最初に一致したレイヤーが採用されます．どのレイヤーにも一致しないファイルは「その他」に入ります．`roots` を指定したレイヤーはワークスペース外のフォルダだけを走査します．",
+					"markdownDescription": "レイヤーの定義．各レイヤーは独立したパネルとして表示されます（最大 8 個）．上から順に評価され，最初に一致したレイヤーが採用されます．どのレイヤーにも一致しないファイルは「その他」に入ります．パターンは「スコープルート（ワークスペース自身，または `.gitmodules` の submodule）からの相対パス」に対して評価され，スコープルート配下は親のパターンでは分類されません．`contents/` 直下以下はパターン照合を行わず，`contents/` を宣言したレイヤー（既定では Raw データ層）にそのまま入ります．`roots` を指定したレイヤーはワークスペース外のフォルダだけを走査します．",
 					"default": [
 						{
 							"id": "schema",
@@ -264,15 +299,15 @@
 							"patterns": [
 								".claude/**",
 								".claude.json",
-								"**/CLAUDE.md",
-								"**/CLAUDE.local.md",
-								"**/AGENTS.md",
+								"CLAUDE.md",
+								"CLAUDE.local.md",
+								"AGENTS.md",
 								".agents/**",
 								".codex/**",
 								".cursor/**",
 								".cursorrules",
 								".gemini/**",
-								"**/GEMINI.md",
+								"GEMINI.md",
 								".github/copilot-instructions.md",
 								".github/instructions/**",
 								".github/prompts/**",
@@ -359,7 +394,7 @@
 								"items": {
 									"type": "string"
 								},
-								"description": "ルートからの相対 glob パターン"
+								"description": "スコープルートからの相対 glob パターン"
 							},
 							"roots": {
 								"type": "array",
@@ -398,6 +433,11 @@
 					"type": "boolean",
 					"default": true,
 					"description": "標準エクスプローラー上のファイルにレイヤーのバッジと色を付ける"
+				},
+				"layeredkb.spike.enableGrid": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "SPIKE (2026-09-08): 検証用のグリッドサイドバー試作を有効にする．既定では無効で，通常の表示には影響しない．"
 				},
 				"layeredkb.followSymlinks": {
 					"type": "boolean",
